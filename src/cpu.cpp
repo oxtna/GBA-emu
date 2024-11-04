@@ -10,11 +10,10 @@ GBA::CPU::~CPU() {
 GBA::InstructionType GBA::CPU::decodeArm(uint32_t opcode) {
     uint32_t cond = (opcode >> 28);
     uint32_t a = (opcode >> 25) & 0x7;
-    if(a == 0b001)
+    switch (a) {
+    case 0b001: 
         return GBA::InstructionType::DataProcessing;
-    if(a == 0b000)
-    {
-        
+    case 0b000: {
         uint32_t c = (opcode >> 22) & 0x7; // temp variable name bites 24:22
         uint32_t d = (opcode >> 4) & 0xF;// temp variable name bites 7:4
         uint32_t e = (opcode >> 8) & 0xF;// temp variable name bites 11:8
@@ -41,17 +40,17 @@ GBA::InstructionType GBA::CPU::decodeArm(uint32_t opcode) {
             if(branch_exchange_check == 0x12FFF1)
                 return GBA::InstructionType::BranchAndExchange;
         }
+        break;
     }
-    else if(a == 0b011)
+    case 0b011:
         return GBA::InstructionType::SingleDataTransfer;
-    else if(a == 0b100)
+    case 0b100:
         return GBA::InstructionType::BlockDataTransfer;
-    else if(a == 0b101)
+    case 0b101:
         return GBA::InstructionType::Branch;
-    else if(a == 0b110)
+    case 0b110:
         return GBA::InstructionType::CoprocessorDataTransfer;
-    else if(a == 0b111)
-    {
+    case 0b111: {
         bool b = (opcode >> 24) & 0x1;
         if(b)
             return GBA::InstructionType::SoftwareInterrupt;
@@ -62,8 +61,13 @@ GBA::InstructionType GBA::CPU::decodeArm(uint32_t opcode) {
                 return GBA::InstructionType::CoprocessorDataOperation;
             else
                 return GBA::InstructionType::CoprocessorRegisterTransfer;
+            
+            break;
         }
     }
-    return GBA::InstructionType::Undefined;
+    default:
+        break;
+    }
 
+    return GBA::InstructionType::Undefined;
 }
