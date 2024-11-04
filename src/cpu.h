@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "opcode.h"
+#include "instruction_types.h"
 
 namespace GBA {
 
@@ -11,7 +12,7 @@ class CPU
   public:
     CPU();
     ~CPU();
-    Opcode decodeArm(uint32_t opcode);
+    InstructionType decodeArm(uint32_t opcode);
 
   private:
     uint32_t registers[16];

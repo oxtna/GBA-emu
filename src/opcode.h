@@ -1,3 +1,5 @@
+#ifndef GBA_OPCODE_H
+#define GBA_OPCODE_H
 namespace GBA {
     enum Opcode
     {
@@ -19,3 +21,4 @@ namespace GBA {
         MVN = 0x0F
     };
 }
+#endif

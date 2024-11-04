@@ -16,5 +16,6 @@ void GBA::Emulator::loadROM(GBA::UniquePtr<uint8_t> rom) {
 
 bool GBA::Emulator::run() {
     // TODO
+    return true;
 }
 
