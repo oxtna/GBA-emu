@@ -1,24 +1,27 @@
 #ifndef GBA_OPCODE_H
 #define GBA_OPCODE_H
+
 namespace GBA {
-    enum Opcode
-    {
-        AND = 0x00,
-        XOR = 0x01,
-        SUB = 0x02,
-        RSB = 0x03,
-        ADD = 0x04,
-        ADC = 0x05,
-        SBC = 0x06,
-        RSC = 0x07,
-        TST = 0x08,
-        TEQ = 0x09,
-        CMP = 0x0A,
-        CMN = 0x0B,
-        ORR = 0x0C,
-        MOV = 0x0D,
-        BIC = 0x0E,
-        MVN = 0x0F
-    };
+
+enum Opcode {
+    AND = 0x0,
+    XOR = 0x1,
+    SUB = 0x2,
+    RSB = 0x3,
+    ADD = 0x4,
+    ADC = 0x5,
+    SBC = 0x6,
+    RSC = 0x7,
+    TST = 0x8,
+    TEQ = 0x9,
+    CMP = 0xA,
+    CMN = 0xB,
+    ORR = 0xC,
+    MOV = 0xD,
+    BIC = 0xE,
+    MVN = 0xF,
+};
+
 }
+
 #endif
