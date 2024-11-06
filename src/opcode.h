@@ -3,7 +3,7 @@
 
 namespace GBA {
 
-enum Opcode {
+enum class Opcode {
     AND = 0x0,
     XOR = 0x1,
     SUB = 0x2,

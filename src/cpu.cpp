@@ -2,6 +2,22 @@
 #include <iostream>
 
 GBA::CPU::CPU() : registers{}, CPSR{}, SPSR_FIQ{}, SPSR_SVC{}, SPSR_ABT{}, SPSR_IRQ{}, SPSR_UND{} {
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::AND)] = &GBA::CPU::ANDArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::XOR)] = &GBA::CPU::XORArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::SUB)] = &GBA::CPU::SUBArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::RSB)] = &GBA::CPU::RSBArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::ADD)] = &GBA::CPU::ADDArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::ADC)] = &GBA::CPU::ADCArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::SBC)] = &GBA::CPU::SBCArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::RSC)] = &GBA::CPU::RSCArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::TST)] = &GBA::CPU::TSTArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::TEQ)] = &GBA::CPU::TEQArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::CMP)] = &GBA::CPU::CMPArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::CMN)] = &GBA::CPU::CMNArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::ORR)] = &GBA::CPU::ORRArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::MOV)] = &GBA::CPU::MOVArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::BIC)] = &GBA::CPU::BICArm;
+    data_processing_instruction_type[static_cast<int>(GBA::Opcode::MVN)] = &GBA::CPU::MVNArm;
 }
 
 // Opcode bits increase right to left, leftmost being the most significant
@@ -62,6 +78,103 @@ GBA::InstructionType GBA::CPU::decodeArm(uint32_t opcode) {
 
 void GBA::CPU::reset() {
     // TODO: see declaration in header file
+    R_SVC(14) = PC();   // Overwrites R14_svc and SPSR_svc by copying the current values of the PC and CPSR into them
+    SPSR_SVC = CPSR;    
+    CPSR = 0xD3;        // sets 4:0 bits to 0b10011 and I and F bits to 1 (IRQ and FIQ disabled) T bit to 0 (ARM mode)
+    PC() = 0;           // sets the PC to 0
+    // TODO
+    // Reverts to ARM state if necessary and resumes execution.
+}
+
+GBA::CPU::Mode GBA::CPU::getMode() const {
+    uint32_t mode = CPSR & 0x1F;
+    switch (mode) {
+    case 0b10000:
+        return GBA::CPU::Mode::User;
+    case 0b10001:
+        return GBA::CPU::Mode::FastInterrupt;
+    case 0b10010:
+        return GBA::CPU::Mode::Interrupt;
+    case 0b10011:
+        return GBA::CPU::Mode::Supervisor;
+    case 0b10111:
+        return GBA::CPU::Mode::Abort;
+    case 0b11011:
+        return GBA::CPU::Mode::Undefined;
+    case 0b11111:
+        return GBA::CPU::Mode::System;
+    }
+
+    //TODO: invalid mode error handling
+    throw;
+}
+
+void GBA::CPU::ANDArm(uint32_t instruction_code){}
+void GBA::CPU::XORArm(uint32_t instruction_code){}
+void GBA::CPU::SUBArm(uint32_t instruction_code){}
+void GBA::CPU::RSBArm(uint32_t instruction_code){}
+void GBA::CPU::ADDArm(uint32_t instruction_code){}
+void GBA::CPU::ADCArm(uint32_t instruction_code){}
+void GBA::CPU::SBCArm(uint32_t instruction_code){}
+void GBA::CPU::RSCArm(uint32_t instruction_code){}
+void GBA::CPU::TSTArm(uint32_t instruction_code){}
+void GBA::CPU::TEQArm(uint32_t instruction_code){}
+void GBA::CPU::CMPArm(uint32_t instruction_code){}
+void GBA::CPU::CMNArm(uint32_t instruction_code){}
+void GBA::CPU::ORRArm(uint32_t instruction_code){}
+void GBA::CPU::MOVArm(uint32_t instruction_code){}
+void GBA::CPU::BICArm(uint32_t instruction_code){}
+void GBA::CPU::MVNArm(uint32_t instruction_code){}
+
+bool GBA::CPU::checkCondition(uint32_t instruction_code) const{
+    uint32_t condition = (instruction_code >> 28) & 0xF;
+    uint32_t N = (CPSR >> 31) & 0x1;
+    uint32_t Z = (CPSR >> 30) & 0x1;
+    uint32_t C = (CPSR >> 29) & 0x1;
+    uint32_t V = (CPSR >> 28) & 0x1;
+    switch (condition) {
+    case 0b0000: return Z == 1;
+    case 0b0001: return Z == 0;
+    case 0b0010: return C == 1;
+    case 0b0011: return C == 0;
+    case 0b0100: return N == 1;
+    case 0b0101: return N == 0;
+    case 0b0110: return V == 1;
+    case 0b0111: return V == 0;
+    case 0b1000: return C == 1 && Z == 0;
+    case 0b1001: return C == 0 || Z == 1;   
+    case 0b1010: return N == V;
+    case 0b1011: return N != V;
+    case 0b1100: return Z == 0 && N == V;
+    case 0b1101: return Z == 1 || N != V;
+    case 0b1110: return true;
+    case 0b1111: throw; //This is never used/reserved flag so I am not sure what to do here
+    default: throw; //TODO: invalid condition error handling
+    }
+}
+
+GBA::Opcode GBA::CPU::getOpcodeArm(uint32_t instruction_code) const {
+    return static_cast<GBA::Opcode>((instruction_code >> 21) & 0xF);
+}
+
+void GBA::CPU::callDataProcessingInstruction(uint32_t instruction_code)
+{
+    if(!checkCondition(instruction_code))
+        return; //If the condition is not met, do nothing, later check what should happen if anything
+    
+    (this->*data_processing_instruction_type[
+        static_cast<int>(getOpcodeArm(instruction_code))    // Do not touch it will break the code
+        ])(instruction_code);
+
+    /* // This part needs to be moved to seperate function and will be used by instructions functions
+    bool S = (instruction_code >> 20) & 0x1;
+    uint32_t Rn = (instruction_code >> 16) & 0xF;
+    uint32_t Rd = (instruction_code >> 12) & 0xF;
+    bool bit25 = (instruction_code >> 25) & 0x1;
+    uint32_t operand2 = instruction_code & 0xFFF; //temporary
+    */
+    
+    throw; //TODO: implement all the other cases
 }
 
 uint32_t& GBA::CPU::SP(GBA::CPU::Mode mode) {
