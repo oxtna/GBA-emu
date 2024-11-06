@@ -66,7 +66,7 @@ class CPU
     const uint32_t& R_UND(uint32_t index) const;
 
   private:
-    enum RegisterIndex {
+    enum class RegisterIndex {
         R0 = 0,
         R1 = 1,
         R2 = 2,
