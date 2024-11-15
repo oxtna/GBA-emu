@@ -47,6 +47,7 @@ class CPU
     void BICArm(uint32_t instruction_code);
     void MVNArm(uint32_t instruction_code);
 
+
     using DataProcessingInstructionType = void (CPU::*)(uint32_t);
     std::array<DataProcessingInstructionType, 16> data_processing_instruction_type;
 

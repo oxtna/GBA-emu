@@ -1,6 +1,7 @@
 #include "cpu.h"
 #include <iostream>
 
+
 GBA::CPU::CPU() : registers{}, CPSR{}, SPSR_FIQ{}, SPSR_SVC{}, SPSR_ABT{}, SPSR_IRQ{}, SPSR_UND{} {
     data_processing_instruction_type[static_cast<int>(GBA::Opcode::AND)] = &GBA::CPU::ANDArm;
     data_processing_instruction_type[static_cast<int>(GBA::Opcode::XOR)] = &GBA::CPU::XORArm;
@@ -113,7 +114,6 @@ void GBA::CPU::ANDArm(uint32_t instruction_code){}
 void GBA::CPU::XORArm(uint32_t instruction_code){}
 void GBA::CPU::SUBArm(uint32_t instruction_code){}
 void GBA::CPU::RSBArm(uint32_t instruction_code){}
-void GBA::CPU::ADDArm(uint32_t instruction_code){}
 void GBA::CPU::ADCArm(uint32_t instruction_code){}
 void GBA::CPU::SBCArm(uint32_t instruction_code){}
 void GBA::CPU::RSCArm(uint32_t instruction_code){}
@@ -167,14 +167,74 @@ void GBA::CPU::callDataProcessingInstruction(uint32_t instruction_code)
         ])(instruction_code);
 
     /* // This part needs to be moved to seperate function and will be used by instructions functions
-    bool S = (instruction_code >> 20) & 0x1;
+    bool S = (instruction_code >> 20) & 0x1;    // status bit (if 1, the instruction updates the CPSR)
     uint32_t Rn = (instruction_code >> 16) & 0xF;
     uint32_t Rd = (instruction_code >> 12) & 0xF;
-    bool bit25 = (instruction_code >> 25) & 0x1;
     uint32_t operand2 = instruction_code & 0xFFF; //temporary
+
     */
     
     throw; //TODO: implement all the other cases
+}
+
+void GBA::CPU::ADDArm(uint32_t instruction_code)
+{
+    // S status bit (if 1, the instruction updates the CPSR)
+    bool bit_20 = (instruction_code >> 20) & 0x1;    
+    uint32_t Rn = (instruction_code >> 16) & 0xF;
+    uint32_t Rd = (instruction_code >> 12) & 0xF;
+    // I immediate bit (if 1, the operand is an immediate value)
+    bool bit_25 = (instruction_code >> 25) & 0x1;
+    uint32_t operand2 = instruction_code & 0xFFF;
+    if(bit_25)
+    {
+        // 8-bit immediate value
+        uint32_t bits_0_to_7 = operand2 & 0xFF;
+        // Rotate right value bits 
+        uint32_t bits_8_to_11 = (operand2 >> 8) & 0xF;
+        operand2 = (bits_0_to_7 >> bits_8_to_11) | (bits_0_to_7 << (32 - bits_8_to_11));
+    }
+    else
+    {
+        bool bit_4 = (instruction_code >> 4) & 0x1;
+        // register to shift
+        uint32_t Rm = instruction_code & 0xF;
+        // shift type
+        uint32_t bits_5_to_6 = (instruction_code >> 5) & 0x3;
+        // shift amount
+        uint32_t shift_amount;
+        if(bit_4)
+            shift_amount = (instruction_code >> 7) & 0x1F;
+        else
+            shift_amount = R((operand2 >> 8) & 0xF);
+
+        switch (bits_5_to_6)
+        {
+        case 0b00: // Logical shift left
+        {   
+            operand2 = R(Rm) << shift_amount;
+            break;
+        }
+        case 0b01: // Logical shift right
+        {
+            operand2 = R(Rm) >> shift_amount;
+            break;
+        }
+        case 0b10: // Arithmetic shift right
+        {
+            
+            break;
+        }
+        case 0b11: // Rotate right
+        {           
+            operand2 = (R(Rm) >> shift_amount) | (R(Rm) << (32 - shift_amount));
+            break;
+        }
+        default:
+            throw; //TODO: invalid shift type error handling
+        }
+    }
+    R(Rd) = R(Rn) + operand2;
 }
 
 uint32_t& GBA::CPU::SP(GBA::CPU::Mode mode) {
