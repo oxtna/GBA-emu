@@ -1,6 +1,6 @@
 #ifndef GBA_INSTRUCTION_TYPES_H
 #define GBA_INSTRUCTION_TYPES_H
-
+#include<string>
 namespace GBA {
 
 enum class InstructionType {
@@ -20,6 +20,8 @@ enum class InstructionType {
     SoftwareInterrupt,
     Undefined,
 };
+
+std::string getInstructionTypeString(InstructionType instruction_type);
 
 }
 

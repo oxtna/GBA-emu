@@ -29,33 +29,37 @@ GBA::InstructionType GBA::CPU::decodeArm(uint32_t opcode) {
         return GBA::InstructionType::DataProcessing;
     case 0b000: {
         uint32_t bits_27_to_4 = (opcode >> 4) & 0xFFFFFF;
-        uint32_t bits_24_to_22 = (opcode >> 22) & 0x7;
+        uint32_t bits_24_to_23 = (opcode >> 23) & 0x3;
+        uint32_t bits_21_to_20 = (opcode >> 20) & 0x3;
         uint32_t bits_11_to_8 = (opcode >> 8) & 0xF;
         uint32_t bits_7_to_4 = (opcode >> 4) & 0xF;
         bool bit_22 = (opcode >> 22) & 0x1;
-        if (bits_7_to_4 == 0b1001) {
-            if (bits_24_to_22 == 0b000)
-                return GBA::InstructionType::Multiply;
-            else if ((bits_24_to_22 & 0b110) == 0b010)
-                return GBA::InstructionType::MultiplyLong;
-            else if ((bits_24_to_22 & 0b110) == 0b100)
-                return GBA::InstructionType::SingleDataSwap;
-        }
-        if (bits_7_to_4 >= 0b1001) {
-            if (!bit_22 && bits_11_to_8 == 0b0000)
-                return GBA::InstructionType::HalfwordDataTransferRegister;
-            else if (bit_22)
-                return GBA::InstructionType::HalfwordDataTransferImmediate;
-            else
-                return GBA::InstructionType::Undefined;
-        }
-        else if (bits_27_to_4 == 0x12FFF1) {
+
+        if(bits_24_to_23 == 0b00 && bits_7_to_4 == 0b1001)
+            return GBA::InstructionType::Multiply;
+        if(bits_24_to_23 == 0b01 && bits_7_to_4 == 0b1001)
+            return GBA::InstructionType::MultiplyLong;
+        if(bits_24_to_23 == 0b10 && bits_21_to_20 == 0b00 && bits_11_to_8 == 0b0000 && bits_7_to_4 == 0b1001)
+            return GBA::InstructionType::SingleDataSwap;
+        if((opcode & 0x0FFFFFF0) == 0x012FFF10)
             return GBA::InstructionType::BranchAndExchange;
-        }
-        return GBA::InstructionType::Undefined;
+        if(!bit_22 && bits_11_to_8 == 0b0000 && (bits_7_to_4 & 0b1001) == 0b1001)
+            return GBA::InstructionType::HalfwordDataTransferRegister;
+        if(bit_22 && (bits_7_to_4 & 0b1001) == 0b1001)
+            return GBA::InstructionType::HalfwordDataTransferImmediate;
+        
+        return GBA::InstructionType::DataProcessing;
     }
-    case 0b011:
+    case 0b010:
         return GBA::InstructionType::SingleDataTransfer;
+    case 0b011:
+    {
+        bool bit_4 = (opcode >> 4) & 0x1;
+        if(bit_4)
+            return GBA::InstructionType::Undefined;
+        else
+            return GBA::InstructionType::SingleDataTransfer;
+    }
     case 0b100:
         return GBA::InstructionType::BlockDataTransfer;
     case 0b101:
@@ -68,9 +72,9 @@ GBA::InstructionType GBA::CPU::decodeArm(uint32_t opcode) {
         if (bit_24)
             return GBA::InstructionType::SoftwareInterrupt;
         else if (bit_4)
-            return GBA::InstructionType::CoprocessorDataOperation;
-        else
             return GBA::InstructionType::CoprocessorRegisterTransfer;
+        else
+            return GBA::InstructionType::CoprocessorDataOperation;
     }
     default:
         return GBA::InstructionType::Undefined;
@@ -222,7 +226,18 @@ void GBA::CPU::ADDArm(uint32_t instruction_code)
         }
         case 0b10: // Arithmetic shift right
         {
-            
+            int32_t signed_Rm = R(Rm);
+            for(int i = 0; i < shift_amount; i++)
+            {
+                if(signed_Rm < 0 && signed_Rm % 2 == 1)
+                {
+                    signed_Rm /= 2;
+                    signed_Rm--;
+                }
+                else
+                    signed_Rm /= 2;
+            }
+            operand2 = signed_Rm;
             break;
         }
         case 0b11: // Rotate right

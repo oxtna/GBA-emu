@@ -1,6 +1,6 @@
 include_directories(.)
 
-add_library(GBA STATIC emulator.cpp cpu.cpp memory.cpp)
+add_library(GBA STATIC emulator.cpp cpu.cpp memory.cpp instruction_types.cpp)
 
 add_executable(GBA_Emu main.cpp)
 
