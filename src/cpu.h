@@ -24,39 +24,36 @@ class CPU
     CPU();
     ~CPU() = default;
 
-    InstructionType decodeArm(uint32_t opcode);
+    InstructionType decodeArm(uint32_t instruction_code);
     // TODO: https://developer.arm.com/documentation/ddi0210/c/Programmer-s-Model/Reset
     void reset();
 
     Mode getMode() const;
 
-    void ANDArm(uint32_t instruction_code);
-    void XORArm(uint32_t instruction_code);
-    void SUBArm(uint32_t instruction_code);
-    void RSBArm(uint32_t instruction_code);
-    void ADDArm(uint32_t instruction_code);
-    void ADCArm(uint32_t instruction_code);
-    void SBCArm(uint32_t instruction_code);
-    void RSCArm(uint32_t instruction_code);
-    void TSTArm(uint32_t instruction_code);
-    void TEQArm(uint32_t instruction_code);
-    void CMPArm(uint32_t instruction_code);
-    void CMNArm(uint32_t instruction_code);
-    void ORRArm(uint32_t instruction_code);
-    void MOVArm(uint32_t instruction_code);
-    void BICArm(uint32_t instruction_code);
-    void MVNArm(uint32_t instruction_code);
-
+    void andArm(uint32_t instruction_code);
+    void xorArm(uint32_t instruction_code);
+    void subArm(uint32_t instruction_code);
+    void rsbArm(uint32_t instruction_code);
+    void addArm(uint32_t instruction_code);
+    void adcArm(uint32_t instruction_code);
+    void sbcArm(uint32_t instruction_code);
+    void rscArm(uint32_t instruction_code);
+    void tstArm(uint32_t instruction_code);
+    void teqArm(uint32_t instruction_code);
+    void cmpArm(uint32_t instruction_code);
+    void cmnArm(uint32_t instruction_code);
+    void orrArm(uint32_t instruction_code);
+    void movArm(uint32_t instruction_code);
+    void bicArm(uint32_t instruction_code);
+    void mvnArm(uint32_t instruction_code);
 
     using DataProcessingInstructionType = void (CPU::*)(uint32_t);
     std::array<DataProcessingInstructionType, 16> data_processing_instruction_type;
 
+    // Check if the instruction should be executed based on the condition field
     bool checkCondition(uint32_t intruction_code) const;
     Opcode getOpcodeArm(uint32_t intruction_code) const;
-    void callDataProcessingInstruction(uint32_t intruction_code); // this function name needs to be changed
-
-    
-
+    void callDataProcessingInstruction(uint32_t intruction_code);  // this function name needs to be changed
 
     // Stack Pointer, R13 by convention
     uint32_t& SP(Mode mode);
