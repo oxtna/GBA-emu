@@ -160,23 +160,16 @@ GBA::CPU::Mode GBA::CPU::getMode() const {
     }
 }
 
-void GBA::CPU::andArm(uint32_t instruction_code) {
-}
-
-void GBA::CPU::xorArm(uint32_t instruction_code) {
-}
-
-void GBA::CPU::subArm(uint32_t instruction_code) {
-}
-
-void GBA::CPU::rsbArm(uint32_t instruction_code) {
-}
-
-void GBA::CPU::addArm(uint32_t instruction_code) {
-    // S status bit (if 1, the instruction updates the CPSR)
-    bool bit_20 = (instruction_code >> 20) & 0x1;
-    uint32_t Rn = (instruction_code >> 16) & 0xF;
-    uint32_t Rd = (instruction_code >> 12) & 0xF;
+GBA::DataProcessingArguments GBA::CPU::decodeDataProcessingArguments(uint32_t instruction_code, Opcode opcode) {
+    GBA::DataProcessingArguments arguments;
+    if(opcode == GBA::Opcode::TEQ || opcode == GBA::Opcode::CMP || opcode == GBA::Opcode::CMN || opcode == GBA::Opcode::TST) {
+        arguments.S = 1;
+    }
+    else {
+        arguments.S = (instruction_code >> 20) & 0x1;
+    }
+    arguments.Rn = (instruction_code >> 16) & 0xF;
+    arguments.Rd = (instruction_code >> 12) & 0xF;
     // I immediate bit (if 1, the operand is an immediate value)
     bool bit_25 = (instruction_code >> 25) & 0x1;
     uint32_t operand2 = instruction_code & 0xFFF;
@@ -234,40 +227,157 @@ void GBA::CPU::addArm(uint32_t instruction_code) {
             throw;  // TODO: invalid shift type error handling
         }
     }
-    R(Rd) = R(Rn) + operand2;
+    arguments.operand2 = operand2;
+    return arguments;
+}
+
+void GBA::CPU::dataProcessingArmLogicalOperationFlagsSetting(bool S, uint32_t Rd, uint32_t operation_result) // for exapmple TST does not save its result in R(Rd) that's why we need it
+{
+    if (!S || Rd == 15)   // TODO setting carry flag
+        return;
+    if(operation_result & (1 << 31)) // setting negative flag
+        CPSR |= (1 << 31);
+    else 
+        CPSR &= ~(1 << 31);
+
+    if(R(operation_result) == 0) // setting zero flag
+        CPSR |= (1 << 30);
+    else 
+        CPSR &= ~(1 << 30);
+
+}
+
+void GBA::CPU::dataProcessingArmArithmeticOperationFlagsSetting(bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result) {
+    if (!S || Rd == 15) 
+        return; 
+   
+    if (result & (1 << 31))  // setting negative flag
+        CPSR |= (1 << 31); 
+    else 
+        CPSR &= ~(1 << 31); 
+    
+    if (result == 0)  // setting zero flag
+        CPSR |= (1 << 30); 
+     else 
+        CPSR &= ~(1 << 30);
+
+    if (Rd_before_operation > Rd) // setting carry flag TODO: check if it is correct
+        CPSR |= (1 << 29);
+    else 
+        CPSR &= ~(1 << 29);
+    
+
+    bool sign_bit_result = (result >> 31) & 1;
+    bool sign_bit_Rd = (Rd >> 31) & 1;
+    bool sign_bit_Rd_before = (Rd_before_operation >> 31) & 1;
+
+    if ((sign_bit_Rd_before == sign_bit_Rd) && (sign_bit_Rd != sign_bit_result))  // setting overflow flag
+        CPSR |= (1 << 28);
+    else 
+        CPSR &= ~(1 << 28);
+    
+}
+
+void GBA::CPU::andArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::AND);
+    R(arguments.Rd) = R(arguments.Rn) & arguments.operand2;
+    dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd));
+}
+
+void GBA::CPU::xorArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::XOR);
+    R(arguments.Rd) = R(arguments.Rn) ^ arguments.operand2;
+    dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd));
+}
+
+void GBA::CPU::subArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::SUB);
+    uint32_t Rd_before_operation = R(arguments.Rd);
+    R(arguments.Rd) = R(arguments.Rn) - arguments.operand2;
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
+}
+
+void GBA::CPU::rsbArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::RSB);
+    uint32_t Rd_before_operation = R(arguments.Rd);
+    R(arguments.Rd) = arguments.operand2 - R(arguments.Rn);
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
+}
+
+void GBA::CPU::addArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::ADD);
+    uint32_t Rd_before_operation = R(arguments.Rd);
+    R(arguments.Rd) = R(arguments.Rn) + arguments.operand2;
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
 }
 
 void GBA::CPU::adcArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::ADC);
+    uint32_t Rd_before_operation = R(arguments.Rd);
+    R(arguments.Rd) = R(arguments.Rn) + arguments.operand2 + ((CPSR >> 29) & 0x1);
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
 }
 
 void GBA::CPU::sbcArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::SBC);
+    uint32_t Rd_before_operation = R(arguments.Rd);
+    R(arguments.Rd) = R(arguments.Rn) - arguments.operand2 - ((CPSR >> 29) & 0x1);
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
 }
 
 void GBA::CPU::rscArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::RSC);
+    uint32_t Rd_before_operation = R(arguments.Rd);
+    R(arguments.Rd) = arguments.operand2 - R(arguments.Rn) - ((CPSR >> 29) & 0x1);
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
 }
 
 void GBA::CPU::tstArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::TST);
+    uint32_t result = R(arguments.Rn) & arguments.operand2;
+    dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, result);
 }
 
 void GBA::CPU::teqArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::TEQ);
+    uint32_t result = R(arguments.Rn) ^ arguments.operand2;
+    dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, result);
 }
 
 void GBA::CPU::cmpArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::CMP);
+    uint32_t result = R(arguments.Rn) - arguments.operand2;
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, R(arguments.Rn), arguments.Rd, result);
 }
 
 void GBA::CPU::cmnArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::CMN);
+    uint32_t result = R(arguments.Rn) + arguments.operand2;
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, R(arguments.Rn), arguments.Rd, result);
 }
 
 void GBA::CPU::orrArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::ORR);
+    R(arguments.Rd) = R(arguments.Rn) | arguments.operand2;
+    dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd));
 }
 
 void GBA::CPU::movArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::MOV);
+    R(arguments.Rd) = arguments.operand2;
+    dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd));
 }
 
 void GBA::CPU::bicArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::BIC);
+    R(arguments.Rd) = R(arguments.Rn) & ~arguments.operand2;
+    dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd));
 }
 
 void GBA::CPU::mvnArm(uint32_t instruction_code) {
+    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, GBA::Opcode::MVN);
+    R(arguments.Rd) = ~arguments.operand2;
+    dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd));
 }
 
 bool GBA::CPU::checkCondition(uint32_t instruction_code) const {

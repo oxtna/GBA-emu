@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "instruction_types.h"
+#include "instruction_types_arguments.h"
 #include "opcode.h"
 #include <array>
 
@@ -30,6 +31,9 @@ class CPU
 
     Mode getMode() const;
 
+    DataProcessingArguments decodeDataProcessingArguments(uint32_t instruction_code, Opcode opcode);
+    void dataProcessingArmLogicalOperationFlagsSetting(bool S, uint32_t Rd, uint32_t operation_result);
+    void dataProcessingArmArithmeticOperationFlagsSetting(bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result);
     void andArm(uint32_t instruction_code);
     void xorArm(uint32_t instruction_code);
     void subArm(uint32_t instruction_code);
