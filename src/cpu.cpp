@@ -431,21 +431,118 @@ void GBA::CPU::callDataProcessingInstruction(uint32_t instruction_code) {
     if (!checkCondition(instruction_code))
         return;  // If the condition is not met, do nothing, later check what should happen if anything
 
-    // Do not touch this, it will break the code
-    // Call the correct data processing method
     (this->*data_processing_instruction_type[static_cast<int>(getOpcodeArm(instruction_code))])(instruction_code);
-
-    /* // This part needs to be moved to seperate function and will be used by instructions functions
-    bool S = (instruction_code >> 20) & 0x1;    // status bit (if 1, the instruction updates the CPSR)
-    uint32_t Rn = (instruction_code >> 16) & 0xF;
-    uint32_t Rd = (instruction_code >> 12) & 0xF;
-    uint32_t operand2 = instruction_code & 0xFFF; //temporary
-
-    */
-
-    throw;  // TODO: implement all the other cases
 }
 
+GBA::MultiplyArguments GBA::CPU::decodeMultiplyArguments(uint32_t instruction_code) {
+    GBA::MultiplyArguments arguments;
+    arguments.A = (instruction_code >> 21) & 0x1;
+    arguments.S = (instruction_code >> 20) & 0x1;
+    arguments.Rd = (instruction_code >> 16) & 0xF;
+    arguments.Rn = (instruction_code >> 12) & 0xF;
+    arguments.Rs = (instruction_code >> 8) & 0xF;
+    arguments.Rm = instruction_code & 0xF;
+    return arguments;
+}
+
+void GBA::CPU::callMultiplyInstruction(uint32_t instruction_code) {
+    if(!checkCondition(instruction_code))
+        return;
+
+    GBA::MultiplyArguments arguments = decodeMultiplyArguments(instruction_code);
+    if(arguments.A)
+        R(arguments.Rd) = R(arguments.Rm) * R(arguments.Rs) + R(arguments.Rn);
+    else
+        R(arguments.Rd) = R(arguments.Rm) * R(arguments.Rs);
+
+    if(arguments.S && arguments.Rd != 15) {
+        if(R(arguments.Rd) & (1 << 31))
+            CPSR |= (1 << 31);
+        else
+            CPSR &= ~(1 << 31);
+
+        if(R(arguments.Rd) == 0)
+            CPSR |= (1 << 30);
+        else
+            CPSR &= ~(1 << 30);
+
+        CPSR &= ~(1 << 29); // Clearing carry flag it instruction says it should be set to meaningless value 
+    }
+}
+
+GBA::MultiplyLongArguments GBA::CPU::decodeMultiplyLongArguments(uint32_t instruction_code) {
+    GBA::MultiplyLongArguments arguments;
+    arguments.U = (instruction_code >> 23) & 0x1;
+    arguments.A = (instruction_code >> 21) & 0x1;
+    arguments.S = (instruction_code >> 20) & 0x1;
+    arguments.RdHi = (instruction_code >> 16) & 0xF;
+    arguments.RdLo = (instruction_code >> 12) & 0xF;
+    arguments.Rm = (instruction_code >> 8) & 0xF;
+    arguments.Rs = instruction_code & 0xF;
+    return arguments;
+}
+
+void GBA::CPU::umullArm(MultiplyLongArguments arguments){
+    uint64_t result = R(arguments.Rm) * R(arguments.Rs);
+    R(arguments.RdLo) = result & 0xFFFFFFFF;
+    R(arguments.RdHi) = result >> 32;
+}
+
+void GBA::CPU::umlalArm(MultiplyLongArguments arguments){
+    uint64_t accumulator = (static_cast<uint64_t>(R(arguments.RdHi)) << 32) | R(arguments.RdLo);
+    uint64_t result = R(arguments.Rm) * R(arguments.Rs) + accumulator;
+    R(arguments.RdLo) = result & 0xFFFFFFFF;
+    R(arguments.RdHi) = (result >> 32) & 0xFFFFFFFF;
+}
+
+void GBA::CPU::smullArm(MultiplyLongArguments arguments){
+    int64_t result = static_cast<int64_t>(arguments.Rm) * static_cast<int64_t>(R(arguments.Rs));
+    R(arguments.RdLo) = static_cast<uint32_t>(result & 0xFFFFFFFF);
+    R(arguments.RdHi) = static_cast<uint32_t>((result >> 32) & 0xFFFFFFFF);
+}
+
+void GBA::CPU::smlalArm(MultiplyLongArguments arguments){
+    int64_t accumulator = (static_cast<int64_t>(R(arguments.RdHi)) << 32) | R(arguments.RdLo);
+    int64_t result = static_cast<int64_t>(R(arguments.Rm)) * static_cast<int64_t>(R(arguments.Rs)) + accumulator;
+    R(arguments.RdLo) = static_cast<uint32_t>(result & 0xFFFFFFFF);
+    R(arguments.RdHi) = static_cast<uint32_t>((result >> 32) & 0xFFFFFFFF);
+}
+
+void GBA::CPU::callMultiplyLongInstruction(uint32_t instruction_code) {
+    if(!checkCondition(instruction_code))
+        return;
+
+    GBA::MultiplyLongArguments arguments = decodeMultiplyLongArguments(instruction_code);
+    if(arguments.U){
+        if(arguments.A)
+            umullArm(arguments);
+        else
+            smullArm(arguments);
+    }
+    else{
+        if(arguments.A)
+            umlalArm(arguments);
+        else
+            smlalArm(arguments);
+    }
+
+    if(arguments.S && arguments.RdHi != 15 && arguments.RdLo != 15){
+        if(R(arguments.RdHi) & (1 << 31))
+            CPSR |= (1 << 31);
+        else
+            CPSR &= ~(1 << 31);
+
+        if(R(arguments.RdHi) == 0 && R(arguments.RdLo) == 0)
+            CPSR |= (1 << 30);
+        else
+            CPSR &= ~(1 << 30);
+
+        CPSR &= ~(1 << 29); // Clearing carry flag it instruction says it should be set to meaningless value 
+        CPSR &= ~(1 << 28); // Clearing overflow flag it instruction says it should be set to meaningless value
+    }
+
+    
+}
 uint32_t& GBA::CPU::SP(GBA::CPU::Mode mode) {
     if (mode == GBA::CPU::Mode::User || mode == GBA::CPU::Mode::System) {
         return registers[static_cast<int>(GBA::CPU::RegisterIndex::SP)];

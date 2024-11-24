@@ -6,6 +6,8 @@
 #include "instruction_types_arguments.h"
 #include "opcode.h"
 #include <array>
+#include "memory.h"
+
 
 namespace GBA {
 
@@ -30,6 +32,8 @@ class CPU
     void reset();
 
     Mode getMode() const;
+    // Check if the instruction should be executed based on the condition field
+    bool checkCondition(uint32_t intruction_code) const;
 
     DataProcessingArguments decodeDataProcessingArguments(uint32_t instruction_code, Opcode opcode);
     void dataProcessingArmLogicalOperationFlagsSetting(bool S, uint32_t Rd, uint32_t operation_result);
@@ -50,15 +54,23 @@ class CPU
     void movArm(uint32_t instruction_code);
     void bicArm(uint32_t instruction_code);
     void mvnArm(uint32_t instruction_code);
-
     using DataProcessingInstructionType = void (CPU::*)(uint32_t);
     std::array<DataProcessingInstructionType, 16> data_processing_instruction_type;
-
-    // Check if the instruction should be executed based on the condition field
-    bool checkCondition(uint32_t intruction_code) const;
+  
     Opcode getOpcodeArm(uint32_t intruction_code) const;
     void callDataProcessingInstruction(uint32_t intruction_code);  // this function name needs to be changed
 
+    void callMultiplyInstruction(uint32_t intruction_code);
+    MultiplyArguments decodeMultiplyArguments(uint32_t instruction_code);
+
+    void callMultiplyLongInstruction(uint32_t instruction_code);
+    MultiplyLongArguments decodeMultiplyLongArguments(uint32_t instruction_code);
+    void umullArm(MultiplyLongArguments arguments);
+    void umlalArm(MultiplyLongArguments arguments);
+    void smullArm(MultiplyLongArguments argumentse);
+    void smlalArm(MultiplyLongArguments arguments);
+
+    
     // Stack Pointer, R13 by convention
     uint32_t& SP(Mode mode);
     const uint32_t& SP(Mode mode) const;
@@ -157,6 +169,7 @@ class CPU
     uint32_t SPSR_ABT;
     uint32_t SPSR_IRQ;
     uint32_t SPSR_UND;
+    Memory memory;
 };
 }
 
