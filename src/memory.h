@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include <vector>
+#include <cstdint>
 
 namespace GBA {
 
@@ -11,7 +12,7 @@ class Memory
   public:
     Memory();
     ~Memory();
-    std::vector<std::byte>memory;
+    std::vector<uint8_t>memory;
   private:
   
 };

@@ -7,6 +7,8 @@
 #include "opcode.h"
 #include <array>
 #include "memory.h"
+#include <iostream>
+#include <utility>
 
 
 namespace GBA {
@@ -36,27 +38,28 @@ class CPU
     bool checkCondition(uint32_t intruction_code) const;
 
     DataProcessingArguments decodeDataProcessingArguments(uint32_t instruction_code, Opcode opcode);
-    void dataProcessingArmLogicalOperationFlagsSetting(bool S, uint32_t Rd, uint32_t operation_result);
+    void dataProcessingArmLogicalOperationFlagsSetting(bool S, uint32_t Rd, uint32_t operation_result, bool carry);
     void dataProcessingArmArithmeticOperationFlagsSetting(bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result);
-    void andArm(uint32_t instruction_code);
-    void xorArm(uint32_t instruction_code);
-    void subArm(uint32_t instruction_code);
-    void rsbArm(uint32_t instruction_code);
-    void addArm(uint32_t instruction_code);
-    void adcArm(uint32_t instruction_code);
-    void sbcArm(uint32_t instruction_code);
-    void rscArm(uint32_t instruction_code);
-    void tstArm(uint32_t instruction_code);
-    void teqArm(uint32_t instruction_code);
-    void cmpArm(uint32_t instruction_code);
-    void cmnArm(uint32_t instruction_code);
-    void orrArm(uint32_t instruction_code);
-    void movArm(uint32_t instruction_code);
-    void bicArm(uint32_t instruction_code);
-    void mvnArm(uint32_t instruction_code);
-    using DataProcessingInstructionType = void (CPU::*)(uint32_t);
+    void andArm(DataProcessingArguments arguments);
+    void xorArm(DataProcessingArguments arguments);
+    void subArm(DataProcessingArguments arguments);
+    void rsbArm(DataProcessingArguments arguments);
+    void addArm(DataProcessingArguments arguments);
+    void adcArm(DataProcessingArguments arguments);
+    void sbcArm(DataProcessingArguments arguments);
+    void rscArm(DataProcessingArguments arguments);
+    void tstArm(DataProcessingArguments arguments);
+    void teqArm(DataProcessingArguments arguments);
+    void cmpArm(DataProcessingArguments arguments);
+    void cmnArm(DataProcessingArguments arguments);
+    void orrArm(DataProcessingArguments arguments);
+    void movArm(DataProcessingArguments arguments);
+    void bicArm(DataProcessingArguments arguments);
+    void mvnArm(DataProcessingArguments arguments);
+    using DataProcessingInstructionType = void (CPU::*)(DataProcessingArguments);
     std::array<DataProcessingInstructionType, 16> data_processing_instruction_type;
   
+    std::pair<uint32_t, bool> calculateOperand2(uint32_t shifted_value, uint32_t shift_value, ShiftType shift_type);
     Opcode getOpcodeArm(uint32_t intruction_code) const;
     void callDataProcessingInstruction(uint32_t intruction_code);  // this function name needs to be changed
 
@@ -69,6 +72,12 @@ class CPU
     void umlalArm(MultiplyLongArguments arguments);
     void smullArm(MultiplyLongArguments argumentse);
     void smlalArm(MultiplyLongArguments arguments);
+
+
+    void callSingleDataTransferInstruction(uint32_t instruction_code);
+    SingleDataTransferArguments decodeSingleDataTransferArguments(uint32_t instruction_code);
+    void ldrArm(SingleDataTransferArguments arguments);
+    void strArm(SingleDataTransferArguments arguments);
 
     
     // Stack Pointer, R13 by convention
