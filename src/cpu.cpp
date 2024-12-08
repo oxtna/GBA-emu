@@ -575,7 +575,7 @@ void GBA::CPU::ldrArm(SingleDataTransferArguments arguments){
         offset = arguments.offset;
     }
 
-    if(arguments.U)
+    if(arguments.U) // TODO I don't think this is correct
         address += offset;
     else
         address -= offset;
@@ -605,7 +605,55 @@ void GBA::CPU::ldrArm(SingleDataTransferArguments arguments){
 }
 
 void GBA::CPU::strArm(SingleDataTransferArguments arguments){
-    throw;
+    uint32_t address = R(arguments.Rn);
+    uint32_t offset;
+
+    if(arguments.I)
+    {
+        uint32_t shifted_value = R(arguments.offset & 0xF);
+        ShiftType shift_type = static_cast<ShiftType>((arguments.offset >> 5) & 0x3);
+        bool bit_4 = (arguments.offset >> 4) & 0x1;
+        uint32_t shift_value = 0;
+        if (bit_4)
+            shift_value = R((arguments.offset >> 8) & 0xF);
+        else
+            shift_value = (arguments.offset >> 7) & 0x1F;
+
+        auto operand2 = calculateOperand2(shifted_value, shift_value, shift_type);
+        offset = operand2.first;
+    }
+    else
+    {
+        offset = arguments.offset;
+    }
+
+    if(arguments.U) // TODO I don't think this is correct
+        address += offset;
+    else
+        address -= offset;
+
+    if(arguments.P) {// pre indexing
+        if(arguments.U)
+            address += arguments.offset;
+        else
+            address -= arguments.offset;
+    }
+
+    if(arguments.B)
+        memory.memory[address] = R(arguments.Rd);
+    else
+    {
+        memory.memory[address] = R(arguments.Rd) & 0xFF;
+        memory.memory[address + 1] = (R(arguments.Rd) >> 8) & 0xFF;
+    }
+
+    if(arguments.W == 1)
+    {
+        if(arguments.U)
+            R(arguments.Rn) += arguments.offset;
+        else
+            R(arguments.Rn) -= arguments.offset;
+    }
 }
 
 // LDR R0, [R1, #4]
@@ -620,6 +668,201 @@ void GBA::CPU::callSingleDataTransferInstruction(uint32_t instruction_code){
         ldrArm(arguments);
     else
         strArm(arguments);
+}
+
+GBA::HalfWordAndSignedDataTransferArguments GBA::CPU::decodeHalfWordAndSignedDataTransferArguments(uint32_t instruction_code){
+    GBA::HalfWordAndSignedDataTransferArguments arguments;
+    arguments.P = (instruction_code >> 24) & 0x1;
+    arguments.U = (instruction_code >> 23) & 0x1;
+    arguments.W = (instruction_code >> 21) & 0x1;
+    arguments.L = (instruction_code >> 20) & 0x1;
+    arguments.Rn = (instruction_code >> 16) & 0xF;
+    arguments.Rd = (instruction_code >> 12) & 0xF;
+    arguments.S = (instruction_code >> 6) & 0x1;
+    arguments.H = (instruction_code >> 5) & 0x1;
+    bool bit_22 = (instruction_code >> 22) & 0x1;
+    if(bit_22)
+    {
+        uint32_t bits_8_11 = (instruction_code >> 8) & 0xF;
+        uint32_t bits_0_3 = instruction_code & 0xF;
+        arguments.offset = (bits_8_11 << 4) | bits_0_3;
+    }
+    else
+        arguments.offset = R(instruction_code & 0xF);
+
+    return arguments;
+}
+
+void GBA::CPU::ldrhArm(HalfWordAndSignedDataTransferArguments arguments){
+    uint32_t address = R(arguments.Rn);
+    if(arguments.U)
+        address += arguments.offset;
+    else
+        address -= arguments.offset;
+
+    if(arguments.P)
+    {
+        if(arguments.U)
+            address += arguments.offset;
+        else
+            address -= arguments.offset;
+    }
+
+    R(arguments.Rd) = memory.memory[address];
+    R(arguments.Rd) |= memory.memory[address + 1] << 8;
+
+    if(arguments.W)
+    {
+        if(arguments.U)
+            R(arguments.Rn) += arguments.offset;
+        else
+            R(arguments.Rn) -= arguments.offset;
+    }
+}
+
+void GBA::CPU::strhArm(HalfWordAndSignedDataTransferArguments arguments){
+    uint32_t address = R(arguments.Rn);
+    if(arguments.U)
+        address += arguments.offset;
+    else
+        address -= arguments.offset;
+
+    if(arguments.P)
+    {
+        if(arguments.U)
+            address += arguments.offset;
+        else
+            address -= arguments.offset;
+    }
+
+    memory.memory[address] = R(arguments.Rd) & 0xFF;
+    memory.memory[address + 1] = (R(arguments.Rd) >> 8) & 0xFF;
+
+    if(arguments.W)
+    {
+        if(arguments.U)
+            R(arguments.Rn) += arguments.offset;
+        else
+            R(arguments.Rn) -= arguments.offset;
+    }
+}
+
+void GBA::CPU::ldrsbArm(HalfWordAndSignedDataTransferArguments arguments){
+    uint32_t address = R(arguments.Rn);
+    if(arguments.U)
+        address += arguments.offset;
+    else
+        address -= arguments.offset;
+
+    if(arguments.P)
+    {
+        if(arguments.U)
+            address += arguments.offset;
+        else
+            address -= arguments.offset;
+    }
+
+    R(arguments.Rd) = memory.memory[address];
+    if(R(arguments.Rd) & (1 << 7))
+        R(arguments.Rd) |= 0xFFFFFF00;
+    else
+        R(arguments.Rd) &= 0x000000FF;
+
+    if(arguments.W)
+    {
+        if(arguments.U)
+            R(arguments.Rn) += arguments.offset;
+        else
+            R(arguments.Rn) -= arguments.offset;
+    }
+}
+
+void GBA::CPU::ldrshArm(HalfWordAndSignedDataTransferArguments arguments){
+    uint32_t address = R(arguments.Rn);
+    if(arguments.U)
+        address += arguments.offset;
+    else
+        address -= arguments.offset;
+
+    if(arguments.P)
+    {
+        if(arguments.U)
+            address += arguments.offset;
+        else
+            address -= arguments.offset;
+    }
+
+    R(arguments.Rd) = memory.memory[address];
+    R(arguments.Rd) |= memory.memory[address + 1] << 8;
+    if(R(arguments.Rd) & (1 << 15))
+        R(arguments.Rd) |= 0xFFFF0000;
+    else
+        R(arguments.Rd) &= 0x0000FFFF;
+
+    if(arguments.W)
+    {
+        if(arguments.U)
+            R(arguments.Rn) += arguments.offset;
+        else
+            R(arguments.Rn) -= arguments.offset;
+    }
+}
+
+void GBA::CPU::callHalfWordAndSignedDataTransferInstruction(uint32_t instruction_code) {
+    if(!checkCondition(instruction_code))
+        return;
+
+    GBA::HalfWordAndSignedDataTransferArguments arguments = decodeHalfWordAndSignedDataTransferArguments(instruction_code);
+    if(arguments.L == 0b0)
+        strhArm(arguments);
+    else
+    {
+        uint32_t bits_S_H = arguments.S << 1 | arguments.H;
+        if(bits_S_H == 0b01)
+            ldrhArm(arguments);
+        else if(bits_S_H == 0b10)
+            ldrsbArm(arguments);
+        else if(bits_S_H == 0b11)
+            ldrshArm(arguments);
+        else
+            throw; // 00 == SWP instruction like this should not exist
+    }
+}
+
+void GBA::CPU::swpArm(uint32_t instruction_code){
+    if(!checkCondition(instruction_code))
+        return;
+
+    uint32_t Rm = instruction_code & 0xF;
+    uint32_t Rd = (instruction_code >> 12) & 0xF;
+    uint32_t Rn = (instruction_code >> 16) & 0xF;
+    uint32_t address = R(Rn);
+    bool bit_22 = (instruction_code >> 22) & 0x1;
+    uint32_t Rm_value = R(Rm);
+    if(bit_22)
+    {
+        R(Rd) = memory.memory[address];
+        R(Rd) &= 0xFF;
+    }
+    else
+    {
+        R(Rd) = memory.memory[address];
+        R(Rd) |= memory.memory[address + 1] << 8;
+        R(Rd) |= memory.memory[address + 2] << 16;
+        R(Rd) |= memory.memory[address + 3] << 24;
+    }
+    
+    if(bit_22)
+    {
+        memory.memory[address] = Rm_value & 0xFF;
+    }
+    else
+    {
+        memory.memory[address] = Rm_value & 0xFF;
+        memory.memory[address + 1] = (Rm_value >> 8) & 0xFF;
+        memory.memory[address + 2] = (Rm_value >> 16) & 0xFF;
+        memory.memory[address + 3] = (Rm_value >> 24) & 0xFF;
+    }
 }
 
 uint32_t& GBA::CPU::SP(GBA::CPU::Mode mode) {

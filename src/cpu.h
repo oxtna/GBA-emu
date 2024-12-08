@@ -79,6 +79,14 @@ class CPU
     void ldrArm(SingleDataTransferArguments arguments);
     void strArm(SingleDataTransferArguments arguments);
 
+    void callHalfWordAndSignedDataTransferInstruction(uint32_t instruction_code);
+    HalfWordAndSignedDataTransferArguments decodeHalfWordAndSignedDataTransferArguments(uint32_t instruction_code);
+    void ldrhArm(HalfWordAndSignedDataTransferArguments arguments);
+    void ldrshArm(HalfWordAndSignedDataTransferArguments arguments);
+    void ldrsbArm(HalfWordAndSignedDataTransferArguments arguments);
+    void strhArm(HalfWordAndSignedDataTransferArguments arguments);
+    
+    void swpArm(uint32_t instruction_code);
     
     // Stack Pointer, R13 by convention
     uint32_t& SP(Mode mode);
