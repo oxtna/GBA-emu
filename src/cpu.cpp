@@ -898,14 +898,6 @@ void GBA::CPU::callBlockDataTransferInstruction(uint32_t instruction_code) {
     else {
         stmArm(arguments);
     }
-    // TODO: what does forcing user mode do?
-    /*
-    if (arguments.S == 0b0) {
-        // do not load PSR or force user mode
-    }
-    else {
-        // load PSR or force user mode
-    }*/
 }
 
 GBA::BlockDataTransferArguments GBA::CPU::decodeBlockDataTransferInstruction(uint32_t instruction_code) {
