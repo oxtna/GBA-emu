@@ -4,12 +4,11 @@
 #include "common.h"
 #include "instruction_types.h"
 #include "instruction_types_arguments.h"
+#include "memory.h"
 #include "opcode.h"
 #include <array>
-#include "memory.h"
 #include <iostream>
 #include <utility>
-
 
 namespace GBA {
 
@@ -29,7 +28,9 @@ class CPU
     CPU();
     ~CPU() = default;
 
-    InstructionType decodeArm(uint32_t instruction_code);
+    void step();
+
+    InstructionType decodeArm(uint32_t instruction_code) const;
     // TODO: https://developer.arm.com/documentation/ddi0210/c/Programmer-s-Model/Reset
     void reset();
 
@@ -39,7 +40,8 @@ class CPU
 
     DataProcessingArguments decodeDataProcessingArguments(uint32_t instruction_code, Opcode opcode);
     void dataProcessingArmLogicalOperationFlagsSetting(bool S, uint32_t Rd, uint32_t operation_result, bool carry);
-    void dataProcessingArmArithmeticOperationFlagsSetting(bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result);
+    void dataProcessingArmArithmeticOperationFlagsSetting(
+        bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result);
     void andArm(DataProcessingArguments arguments);
     void xorArm(DataProcessingArguments arguments);
     void subArm(DataProcessingArguments arguments);
@@ -58,7 +60,7 @@ class CPU
     void mvnArm(DataProcessingArguments arguments);
     using DataProcessingInstructionType = void (CPU::*)(DataProcessingArguments);
     std::array<DataProcessingInstructionType, 16> data_processing_instruction_type;
-  
+
     std::pair<uint32_t, bool> calculateOperand2(uint32_t shifted_value, uint32_t shift_value, ShiftType shift_type);
     Opcode getOpcodeArm(uint32_t intruction_code) const;
     void callDataProcessingInstruction(uint32_t intruction_code);  // this function name needs to be changed
@@ -73,7 +75,6 @@ class CPU
     void smullArm(MultiplyLongArguments argumentse);
     void smlalArm(MultiplyLongArguments arguments);
 
-
     void callSingleDataTransferInstruction(uint32_t instruction_code);
     SingleDataTransferArguments decodeSingleDataTransferArguments(uint32_t instruction_code);
     void ldrArm(SingleDataTransferArguments arguments);
@@ -85,9 +86,15 @@ class CPU
     void ldrshArm(HalfWordAndSignedDataTransferArguments arguments);
     void ldrsbArm(HalfWordAndSignedDataTransferArguments arguments);
     void strhArm(HalfWordAndSignedDataTransferArguments arguments);
-    
+
+    void callSingleDataSwapInstruction(uint32_t instruction_code);
     void swpArm(uint32_t instruction_code);
-    
+
+    void callBlockDataTransferInstruction(uint32_t instruction_code);
+    BlockDataTransferArguments decodeBlockDataTransferInstruction(uint32_t instruction_code);
+    void ldmArm(BlockDataTransferArguments arguments);
+    void stmArm(BlockDataTransferArguments arguments);
+
     // Stack Pointer, R13 by convention
     uint32_t& SP(Mode mode);
     const uint32_t& SP(Mode mode) const;
@@ -102,9 +109,13 @@ class CPU
     uint32_t& PC();
     const uint32_t& PC() const;
 
-    // General purpose registers for User and System mode, R0 to R15
+    // General purpose registers for the current mode
     uint32_t& R(uint32_t index);
     const uint32_t& R(uint32_t index) const;
+
+    // General purpose registers for User and System mode, R0 to R15
+    uint32_t& R_USRSYS(uint32_t index);
+    const uint32_t& R_USRSYS(uint32_t index) const;
 
     // General and banked registers for Fast Interrupt mode, R0 to R7, R8_FIQ to R14_FIQ, and R15
     uint32_t& R_FIQ(uint32_t index);

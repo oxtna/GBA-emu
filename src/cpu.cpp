@@ -19,6 +19,64 @@ GBA::CPU::CPU() : registers{}, CPSR{}, SPSR_FIQ{}, SPSR_SVC{}, SPSR_ABT{}, SPSR_
     data_processing_instruction_type[static_cast<int>(GBA::Opcode::MVN)] = &GBA::CPU::mvnArm;
 }
 
+void GBA::CPU::step() {
+    // TODO: try to reverse the order of fetch->decode->execute? flag issues
+    uint32_t instruction_code = memory.memory[PC()];
+    switch (decodeArm(instruction_code)) {
+    case InstructionType::DataProcessing:
+        callDataProcessingInstruction(instruction_code);
+        break;
+    case InstructionType::ProgramStatusRegisterTransferOut:
+        // call(instruction_code);
+        break;
+    case InstructionType::ProgramStatusRegisterTransferIn:
+        // call(instruction_code);
+        break;
+    case InstructionType::Multiply:
+        callMultiplyInstruction(instruction_code);
+        break;
+    case InstructionType::MultiplyLong:
+        callMultiplyLongInstruction(instruction_code);
+        break;
+    case InstructionType::SingleDataSwap:
+        callSingleDataSwapInstruction(instruction_code);
+        break;
+    case InstructionType::BranchAndExchange:
+        // call(instruction_code);
+        break;
+    case InstructionType::HalfwordDataTransferRegister:
+    case InstructionType::HalfwordDataTransferImmediate:
+        callHalfWordAndSignedDataTransferInstruction(instruction_code);
+        break;
+    case InstructionType::SingleDataTransfer:
+        callSingleDataTransferInstruction(instruction_code);
+        break;
+    case InstructionType::BlockDataTransfer:
+        callBlockDataTransferInstruction(instruction_code);
+        break;
+    case InstructionType::Branch:
+        // call(instruction_code);
+        break;
+    case InstructionType::CoprocessorDataTransfer:
+        // call(instruction_code);
+        break;
+    case InstructionType::CoprocessorDataOperation:
+        // call(instruction_code);
+        break;
+    case InstructionType::CoprocessorRegisterTransfer:
+        // call(instruction_code);
+        break;
+    case InstructionType::SoftwareInterrupt:
+        // call(instruction_code);
+        break;
+    case InstructionType::Undefined:
+        // call(instruction_code);
+        break;
+    default:
+        throw;
+    }
+}
+
 constexpr bool isBranchAndExchange(uint32_t instruction_code) {
     return (instruction_code & 0x0FFFFFF0) == 0x012FFF10;
 }
@@ -87,7 +145,7 @@ constexpr bool isCoprocessorRegisterTransfer(uint32_t instruction_code) {
     return (instruction_code & 0x0F000010) == 0x0E000010;
 }
 
-GBA::InstructionType GBA::CPU::decodeArm(uint32_t instruction_code) {
+GBA::InstructionType GBA::CPU::decodeArm(uint32_t instruction_code) const {
     if (isBranchAndExchange(instruction_code))
         return GBA::InstructionType::BranchAndExchange;
     if (isBlockDataTransfer(instruction_code))
@@ -161,7 +219,8 @@ GBA::CPU::Mode GBA::CPU::getMode() const {
 
 GBA::DataProcessingArguments GBA::CPU::decodeDataProcessingArguments(uint32_t instruction_code, Opcode opcode) {
     GBA::DataProcessingArguments arguments;
-    if(opcode == GBA::Opcode::TEQ || opcode == GBA::Opcode::CMP || opcode == GBA::Opcode::CMN || opcode == GBA::Opcode::TST) {
+    if (opcode == GBA::Opcode::TEQ || opcode == GBA::Opcode::CMP || opcode == GBA::Opcode::CMN ||
+        opcode == GBA::Opcode::TST) {
         arguments.S = 1;
     }
     else {
@@ -187,81 +246,81 @@ GBA::DataProcessingArguments GBA::CPU::decodeDataProcessingArguments(uint32_t in
         arguments.shift_type = static_cast<GBA::ShiftType>((instruction_code >> 5) & 0x3);
         // shift amount
         if (bit_4)
-            arguments.shift_value = R((operand2 >> 8) & 0xF); 
+            arguments.shift_value = R((operand2 >> 8) & 0xF);
         else
             arguments.shift_value = (instruction_code >> 7) & 0x1F;
-
-        }
+    }
     return arguments;
 }
 
-void GBA::CPU::dataProcessingArmLogicalOperationFlagsSetting(bool S, uint32_t Rd, uint32_t operation_result, bool carry) 
-{ // for example TST does not save its result in R(Rd) that's why we need it
-    if (!S || Rd == 15)   // TODO setting carry flag
+void GBA::CPU::dataProcessingArmLogicalOperationFlagsSetting(
+    bool S, uint32_t Rd, uint32_t operation_result,
+    bool carry) {        // for example TST does not save its result in R(Rd) that's why we need it
+    if (!S || Rd == 15)  // TODO setting carry flag
         return;
-    if(operation_result & (1 << 31)) // setting negative flag
+    if (operation_result & (1 << 31))  // setting negative flag
         CPSR |= (1 << 31);
-    else 
+    else
         CPSR &= ~(1 << 31);
 
-    if(R(operation_result) == 0) // setting zero flag
+    if (R(operation_result) == 0)  // setting zero flag
         CPSR |= (1 << 30);
-    else 
+    else
         CPSR &= ~(1 << 30);
 
-    if(carry) // setting carry flag
+    if (carry)  // setting carry flag
         CPSR |= (1 << 29);
-    else 
+    else
         CPSR &= ~(1 << 29);
-
 }
 
-void GBA::CPU::dataProcessingArmArithmeticOperationFlagsSetting(bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result) {
-    if (!S || Rd == 15) 
-        return; 
-   
+void GBA::CPU::dataProcessingArmArithmeticOperationFlagsSetting(
+    bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result) {
+    if (!S || Rd == 15)
+        return;
+
     if (result & (1 << 31))  // setting negative flag
-        CPSR |= (1 << 31); 
-    else 
-        CPSR &= ~(1 << 31); 
-    
+        CPSR |= (1 << 31);
+    else
+        CPSR &= ~(1 << 31);
+
     if (result == 0)  // setting zero flag
-        CPSR |= (1 << 30); 
-    else 
+        CPSR |= (1 << 30);
+    else
         CPSR &= ~(1 << 30);
 
     // TODO: setting carry flag
     // TODO: setting overflow flag
-    
 }
 
-std::pair<uint32_t, bool> GBA::CPU::calculateOperand2(uint32_t shifted_value, uint32_t shift_value, ShiftType shift_type) {
-    if(shift_value == 0)
-        return {shifted_value, (CPSR >> 28) & 1}; // return current carry flag value
+std::pair<uint32_t, bool>
+    GBA::CPU::calculateOperand2(uint32_t shifted_value, uint32_t shift_value, ShiftType shift_type) {
+    if (shift_value == 0)
+        return {shifted_value, (CPSR >> 28) & 1};  // return current carry flag value
 
     switch (shift_type) {
-    case GBA::ShiftType::LogicalLeft:{
+    case GBA::ShiftType::LogicalLeft: {
         bool carry_out = (shifted_value >> (32 - shift_value)) & 0x1;
         return {shifted_value << shift_value, carry_out};
     }
-    case GBA::ShiftType::LogicalRight:{
+    case GBA::ShiftType::LogicalRight: {
         bool carry_out = (shifted_value >> (shift_value - 1)) & 0x1;
         return {shifted_value >> shift_value, carry_out};
     }
-    case GBA::ShiftType::ArithmeticRight:{
+    case GBA::ShiftType::ArithmeticRight: {
         int32_t signed_Rm = *reinterpret_cast<int32_t*>(&shifted_value);
         bool carry_out = (shifted_value >> (shift_value - 1)) & 0x1;
-            for (int32_t i = 0; i < shift_value; i++) {
-                if (signed_Rm < 0 && signed_Rm % 2 == 1) {
-                    signed_Rm /= 2;
-                    signed_Rm--;
-                }
-                else
-                    signed_Rm /= 2;
+        for (int32_t i = 0; i < shift_value; i++) {
+            if (signed_Rm < 0 && signed_Rm % 2 == 1) {
+                signed_Rm /= 2;
+                signed_Rm--;
             }
+            else
+                signed_Rm /= 2;
+        }
         return {*reinterpret_cast<uint32_t*>(&shifted_value), carry_out};
     }
-    case GBA::ShiftType::RotateRight:{
+    case GBA::ShiftType::RotateRight: {
         uint32_t carry_out = (shifted_value >> (shift_value - 1)) & 0x1;
         return {(shifted_value >> shift_value) | (shifted_value << (32 - shift_value)), carry_out};
     }
@@ -423,7 +482,8 @@ void GBA::CPU::callDataProcessingInstruction(uint32_t instruction_code) {
     if (!checkCondition(instruction_code))
         return;  // If the condition is not met, do nothing, later check what should happen if anything
 
-    GBA::DataProcessingArguments arguments = decodeDataProcessingArguments(instruction_code, getOpcodeArm(instruction_code));
+    GBA::DataProcessingArguments arguments =
+        decodeDataProcessingArguments(instruction_code, getOpcodeArm(instruction_code));
     (this->*data_processing_instruction_type[static_cast<int>(getOpcodeArm(instruction_code))])(arguments);
 }
 
@@ -439,27 +499,27 @@ GBA::MultiplyArguments GBA::CPU::decodeMultiplyArguments(uint32_t instruction_co
 }
 
 void GBA::CPU::callMultiplyInstruction(uint32_t instruction_code) {
-    if(!checkCondition(instruction_code))
+    if (!checkCondition(instruction_code))
         return;
 
     GBA::MultiplyArguments arguments = decodeMultiplyArguments(instruction_code);
-    if(arguments.A)
+    if (arguments.A)
         R(arguments.Rd) = R(arguments.Rm) * R(arguments.Rs) + R(arguments.Rn);
     else
         R(arguments.Rd) = R(arguments.Rm) * R(arguments.Rs);
 
-    if(arguments.S && arguments.Rd != 15) {
-        if(R(arguments.Rd) & (1 << 31))
+    if (arguments.S && arguments.Rd != 15) {
+        if (R(arguments.Rd) & (1 << 31))
             CPSR |= (1 << 31);
         else
             CPSR &= ~(1 << 31);
 
-        if(R(arguments.Rd) == 0)
+        if (R(arguments.Rd) == 0)
             CPSR |= (1 << 30);
         else
             CPSR &= ~(1 << 30);
 
-        CPSR &= ~(1 << 29); // Clearing carry flag it instruction says it should be set to meaningless value 
+        CPSR &= ~(1 << 29);  // Clearing carry flag it instruction says it should be set to meaningless value
     }
 }
 
@@ -475,20 +535,20 @@ GBA::MultiplyLongArguments GBA::CPU::decodeMultiplyLongArguments(uint32_t instru
     return arguments;
 }
 
-void GBA::CPU::umullArm(MultiplyLongArguments arguments){
+void GBA::CPU::umullArm(MultiplyLongArguments arguments) {
     uint64_t result = R(arguments.Rm) * R(arguments.Rs);
     R(arguments.RdLo) = result & 0xFFFFFFFF;
     R(arguments.RdHi) = result >> 32;
 }
 
-void GBA::CPU::umlalArm(MultiplyLongArguments arguments){
+void GBA::CPU::umlalArm(MultiplyLongArguments arguments) {
     uint64_t accumulator = (static_cast<uint64_t>(R(arguments.RdHi)) << 32) | R(arguments.RdLo);
     uint64_t result = R(arguments.Rm) * R(arguments.Rs) + accumulator;
     R(arguments.RdLo) = result & 0xFFFFFFFF;
     R(arguments.RdHi) = (result >> 32) & 0xFFFFFFFF;
 }
 
-void GBA::CPU::smullArm(MultiplyLongArguments arguments){
+void GBA::CPU::smullArm(MultiplyLongArguments arguments) {
     int64_t result = static_cast<int64_t>(arguments.Rm) * static_cast<int64_t>(R(arguments.Rs));
     int32_t temp = static_cast<int32_t>(result & 0xFFFFFFFF);
     R(arguments.RdLo) = *reinterpret_cast<uint32_t*>(&temp);
@@ -496,7 +556,7 @@ void GBA::CPU::smullArm(MultiplyLongArguments arguments){
     R(arguments.RdHi) = *reinterpret_cast<uint32_t*>(&temp);
 }
 
-void GBA::CPU::smlalArm(MultiplyLongArguments arguments){
+void GBA::CPU::smlalArm(MultiplyLongArguments arguments) {
     int64_t accumulator = (static_cast<int64_t>(R(arguments.RdHi)) << 32) | R(arguments.RdLo);
     int64_t result = static_cast<int64_t>(R(arguments.Rm)) * static_cast<int64_t>(R(arguments.Rs)) + accumulator;
     int32_t temp = static_cast<int32_t>(result & 0xFFFFFFFF);
@@ -506,37 +566,37 @@ void GBA::CPU::smlalArm(MultiplyLongArguments arguments){
 }
 
 void GBA::CPU::callMultiplyLongInstruction(uint32_t instruction_code) {
-    if(!checkCondition(instruction_code))
+    if (!checkCondition(instruction_code))
         return;
 
     GBA::MultiplyLongArguments arguments = decodeMultiplyLongArguments(instruction_code);
-    if(arguments.U){
-        if(arguments.A)
+    if (arguments.U) {
+        if (arguments.A)
             umullArm(arguments);
         else
             smullArm(arguments);
     }
-    else{
-        if(arguments.A)
+    else {
+        if (arguments.A)
             umlalArm(arguments);
         else
             smlalArm(arguments);
     }
 
-    if(arguments.S && arguments.RdHi != 15 && arguments.RdLo != 15){
-        if(R(arguments.RdHi) & (1 << 31))
+    if (arguments.S && arguments.RdHi != 15 && arguments.RdLo != 15) {
+        if (R(arguments.RdHi) & (1 << 31))
             CPSR |= (1 << 31);
         else
             CPSR &= ~(1 << 31);
 
-        if(R(arguments.RdHi) == 0 && R(arguments.RdLo) == 0)
+        if (R(arguments.RdHi) == 0 && R(arguments.RdLo) == 0)
             CPSR |= (1 << 30);
         else
             CPSR &= ~(1 << 30);
 
-        CPSR &= ~(1 << 29); // Clearing carry flag it instruction says it should be set to meaningless value 
-        CPSR &= ~(1 << 28); // Clearing overflow flag it instruction says it should be set to meaningless value
-    }  
+        CPSR &= ~(1 << 29);  // Clearing carry flag it instruction says it should be set to meaningless value
+        CPSR &= ~(1 << 28);  // Clearing overflow flag it instruction says it should be set to meaningless value
+    }
 }
 
 GBA::SingleDataTransferArguments GBA::CPU::decodeSingleDataTransferArguments(uint32_t instruction_code) {
@@ -553,11 +613,10 @@ GBA::SingleDataTransferArguments GBA::CPU::decodeSingleDataTransferArguments(uin
     return arguments;
 }
 
-void GBA::CPU::ldrArm(SingleDataTransferArguments arguments){
+void GBA::CPU::ldrArm(SingleDataTransferArguments arguments) {
     uint32_t address = R(arguments.Rn);
     uint32_t offset = 0;
-    if(arguments.I)
-    {
+    if (arguments.I) {
         uint32_t shifted_value = R(arguments.offset & 0xF);
         ShiftType shift_type = static_cast<ShiftType>((arguments.offset >> 5) & 0x3);
         bool bit_4 = (arguments.offset >> 4) & 0x1;
@@ -570,46 +629,39 @@ void GBA::CPU::ldrArm(SingleDataTransferArguments arguments){
         auto operand2 = calculateOperand2(shifted_value, shift_value, shift_type);
         offset = operand2.first;
     }
-    else
-    {
+    else {
         offset = arguments.offset;
     }
 
-    if(arguments.U) // TODO I don't think this is correct
-        address += offset;
-    else
-        address -= offset;
-
-    if(arguments.P) {// pre indexing
-        if(arguments.U)
+    if (arguments.P) {  // pre indexing
+        if (arguments.U)
             address += arguments.offset;
         else
             address -= arguments.offset;
     }
 
-    if(arguments.B)
+    if (arguments.B)
         R(arguments.Rd) = memory.memory[address];
-    else
-    {
+    else {
         R(arguments.Rd) = memory.memory[address];
         R(arguments.Rd) |= memory.memory[address + 1] << 8;
+        R(arguments.Rd) |= memory.memory[address + 2] << 16;
+        R(arguments.Rd) |= memory.memory[address + 3] << 24;
     }
 
-    if(arguments.W == 1)
-    {
-        if(arguments.U)
+    if (arguments.W == 1) {
+        if (arguments.U)
             R(arguments.Rn) += arguments.offset;
         else
             R(arguments.Rn) -= arguments.offset;
     }
 }
 
-void GBA::CPU::strArm(SingleDataTransferArguments arguments){
+void GBA::CPU::strArm(SingleDataTransferArguments arguments) {
     uint32_t address = R(arguments.Rn);
     uint32_t offset;
 
-    if(arguments.I)
-    {
+    if (arguments.I) {
         uint32_t shifted_value = R(arguments.offset & 0xF);
         ShiftType shift_type = static_cast<ShiftType>((arguments.offset >> 5) & 0x3);
         bool bit_4 = (arguments.offset >> 4) & 0x1;
@@ -622,56 +674,51 @@ void GBA::CPU::strArm(SingleDataTransferArguments arguments){
         auto operand2 = calculateOperand2(shifted_value, shift_value, shift_type);
         offset = operand2.first;
     }
-    else
-    {
+    else {
         offset = arguments.offset;
     }
 
-    if(arguments.U) // TODO I don't think this is correct
-        address += offset;
-    else
-        address -= offset;
-
-    if(arguments.P) {// pre indexing
-        if(arguments.U)
-            address += arguments.offset;
+    if (arguments.P) {  // pre indexing
+        if (arguments.U)
+            address += offset;
         else
-            address -= arguments.offset;
+            address -= offset;
     }
 
-    if(arguments.B)
+    if (arguments.B)
         memory.memory[address] = R(arguments.Rd);
-    else
-    {
+    else {
         memory.memory[address] = R(arguments.Rd) & 0xFF;
         memory.memory[address + 1] = (R(arguments.Rd) >> 8) & 0xFF;
+        memory.memory[address + 2] = (R(arguments.Rd) >> 16) & 0xFF;
+        memory.memory[address + 3] = (R(arguments.Rd) >> 24) & 0xFF;
     }
 
-    if(arguments.W == 1)
-    {
-        if(arguments.U)
-            R(arguments.Rn) += arguments.offset;
+    if (arguments.W == 1) {
+        if (arguments.U)
+            R(arguments.Rn) += offset;
         else
-            R(arguments.Rn) -= arguments.offset;
+            R(arguments.Rn) -= offset;
     }
 }
 
 // LDR R0, [R1, #4]
 // LDR R0, [R1, #4]!
 // LDR R0, [R1], #4
-void GBA::CPU::callSingleDataTransferInstruction(uint32_t instruction_code){
-    if(!checkCondition(instruction_code))
+void GBA::CPU::callSingleDataTransferInstruction(uint32_t instruction_code) {
+    if (!checkCondition(instruction_code))
         return;
-    
+
     GBA::SingleDataTransferArguments arguments = decodeSingleDataTransferArguments(instruction_code);
-    if(arguments.L)
+    if (arguments.L)
         ldrArm(arguments);
     else
         strArm(arguments);
 }
 
-GBA::HalfWordAndSignedDataTransferArguments GBA::CPU::decodeHalfWordAndSignedDataTransferArguments(uint32_t instruction_code){
-    GBA::HalfWordAndSignedDataTransferArguments arguments;
+GBA::HalfWordAndSignedDataTransferArguments
+    GBA::CPU::decodeHalfWordAndSignedDataTransferArguments(uint32_t instruction_code) {
+    HalfWordAndSignedDataTransferArguments arguments;
     arguments.P = (instruction_code >> 24) & 0x1;
     arguments.U = (instruction_code >> 23) & 0x1;
     arguments.W = (instruction_code >> 21) & 0x1;
@@ -681,8 +728,7 @@ GBA::HalfWordAndSignedDataTransferArguments GBA::CPU::decodeHalfWordAndSignedDat
     arguments.S = (instruction_code >> 6) & 0x1;
     arguments.H = (instruction_code >> 5) & 0x1;
     bool bit_22 = (instruction_code >> 22) & 0x1;
-    if(bit_22)
-    {
+    if (bit_22) {
         uint32_t bits_8_11 = (instruction_code >> 8) & 0xF;
         uint32_t bits_0_3 = instruction_code & 0xF;
         arguments.offset = (bits_8_11 << 4) | bits_0_3;
@@ -693,16 +739,11 @@ GBA::HalfWordAndSignedDataTransferArguments GBA::CPU::decodeHalfWordAndSignedDat
     return arguments;
 }
 
-void GBA::CPU::ldrhArm(HalfWordAndSignedDataTransferArguments arguments){
+void GBA::CPU::ldrhArm(HalfWordAndSignedDataTransferArguments arguments) {
     uint32_t address = R(arguments.Rn);
-    if(arguments.U)
-        address += arguments.offset;
-    else
-        address -= arguments.offset;
 
-    if(arguments.P)
-    {
-        if(arguments.U)
+    if (arguments.P) {
+        if (arguments.U)
             address += arguments.offset;
         else
             address -= arguments.offset;
@@ -711,25 +752,19 @@ void GBA::CPU::ldrhArm(HalfWordAndSignedDataTransferArguments arguments){
     R(arguments.Rd) = memory.memory[address];
     R(arguments.Rd) |= memory.memory[address + 1] << 8;
 
-    if(arguments.W)
-    {
-        if(arguments.U)
+    if (arguments.W) {
+        if (arguments.U)
             R(arguments.Rn) += arguments.offset;
         else
             R(arguments.Rn) -= arguments.offset;
     }
 }
 
-void GBA::CPU::strhArm(HalfWordAndSignedDataTransferArguments arguments){
+void GBA::CPU::strhArm(HalfWordAndSignedDataTransferArguments arguments) {
     uint32_t address = R(arguments.Rn);
-    if(arguments.U)
-        address += arguments.offset;
-    else
-        address -= arguments.offset;
 
-    if(arguments.P)
-    {
-        if(arguments.U)
+    if (arguments.P) {
+        if (arguments.U)
             address += arguments.offset;
         else
             address -= arguments.offset;
@@ -738,55 +773,43 @@ void GBA::CPU::strhArm(HalfWordAndSignedDataTransferArguments arguments){
     memory.memory[address] = R(arguments.Rd) & 0xFF;
     memory.memory[address + 1] = (R(arguments.Rd) >> 8) & 0xFF;
 
-    if(arguments.W)
-    {
-        if(arguments.U)
+    if (arguments.W) {
+        if (arguments.U)
             R(arguments.Rn) += arguments.offset;
         else
             R(arguments.Rn) -= arguments.offset;
     }
 }
 
-void GBA::CPU::ldrsbArm(HalfWordAndSignedDataTransferArguments arguments){
+void GBA::CPU::ldrsbArm(HalfWordAndSignedDataTransferArguments arguments) {
     uint32_t address = R(arguments.Rn);
-    if(arguments.U)
-        address += arguments.offset;
-    else
-        address -= arguments.offset;
 
-    if(arguments.P)
-    {
-        if(arguments.U)
+    if (arguments.P) {
+        if (arguments.U)
             address += arguments.offset;
         else
             address -= arguments.offset;
     }
 
     R(arguments.Rd) = memory.memory[address];
-    if(R(arguments.Rd) & (1 << 7))
+    if (R(arguments.Rd) & (1 << 7))
         R(arguments.Rd) |= 0xFFFFFF00;
     else
         R(arguments.Rd) &= 0x000000FF;
 
-    if(arguments.W)
-    {
-        if(arguments.U)
+    if (arguments.W) {
+        if (arguments.U)
             R(arguments.Rn) += arguments.offset;
         else
             R(arguments.Rn) -= arguments.offset;
     }
 }
 
-void GBA::CPU::ldrshArm(HalfWordAndSignedDataTransferArguments arguments){
+void GBA::CPU::ldrshArm(HalfWordAndSignedDataTransferArguments arguments) {
     uint32_t address = R(arguments.Rn);
-    if(arguments.U)
-        address += arguments.offset;
-    else
-        address -= arguments.offset;
 
-    if(arguments.P)
-    {
-        if(arguments.U)
+    if (arguments.P) {
+        if (arguments.U)
             address += arguments.offset;
         else
             address -= arguments.offset;
@@ -794,14 +817,13 @@ void GBA::CPU::ldrshArm(HalfWordAndSignedDataTransferArguments arguments){
 
     R(arguments.Rd) = memory.memory[address];
     R(arguments.Rd) |= memory.memory[address + 1] << 8;
-    if(R(arguments.Rd) & (1 << 15))
+    if (R(arguments.Rd) & (1 << 15))
         R(arguments.Rd) |= 0xFFFF0000;
     else
         R(arguments.Rd) &= 0x0000FFFF;
 
-    if(arguments.W)
-    {
-        if(arguments.U)
+    if (arguments.W) {
+        if (arguments.U)
             R(arguments.Rn) += arguments.offset;
         else
             R(arguments.Rn) -= arguments.offset;
@@ -809,59 +831,174 @@ void GBA::CPU::ldrshArm(HalfWordAndSignedDataTransferArguments arguments){
 }
 
 void GBA::CPU::callHalfWordAndSignedDataTransferInstruction(uint32_t instruction_code) {
-    if(!checkCondition(instruction_code))
+    if (!checkCondition(instruction_code))
         return;
 
-    GBA::HalfWordAndSignedDataTransferArguments arguments = decodeHalfWordAndSignedDataTransferArguments(instruction_code);
-    if(arguments.L == 0b0)
+    GBA::HalfWordAndSignedDataTransferArguments arguments =
+        decodeHalfWordAndSignedDataTransferArguments(instruction_code);
+    if (arguments.L == 0b0)
         strhArm(arguments);
-    else
-    {
+    else {
         uint32_t bits_S_H = arguments.S << 1 | arguments.H;
-        if(bits_S_H == 0b01)
+        if (bits_S_H == 0b01)
             ldrhArm(arguments);
-        else if(bits_S_H == 0b10)
+        else if (bits_S_H == 0b10)
             ldrsbArm(arguments);
-        else if(bits_S_H == 0b11)
+        else if (bits_S_H == 0b11)
             ldrshArm(arguments);
         else
-            throw; // 00 == SWP instruction like this should not exist
+            throw;  // 00 == SWP instruction like this should not exist
     }
 }
 
-void GBA::CPU::swpArm(uint32_t instruction_code){
-    if(!checkCondition(instruction_code))
+void GBA::CPU::callSingleDataSwapInstruction(uint32_t instruction_code) {
+    if (!checkCondition(instruction_code))
         return;
 
+    swpArm(instruction_code);
+}
+
+void GBA::CPU::swpArm(uint32_t instruction_code) {
     uint32_t Rm = instruction_code & 0xF;
     uint32_t Rd = (instruction_code >> 12) & 0xF;
     uint32_t Rn = (instruction_code >> 16) & 0xF;
     uint32_t address = R(Rn);
     bool bit_22 = (instruction_code >> 22) & 0x1;
     uint32_t Rm_value = R(Rm);
-    if(bit_22)
-    {
+    if (bit_22) {
         R(Rd) = memory.memory[address];
         R(Rd) &= 0xFF;
     }
-    else
-    {
+    else {
         R(Rd) = memory.memory[address];
         R(Rd) |= memory.memory[address + 1] << 8;
         R(Rd) |= memory.memory[address + 2] << 16;
         R(Rd) |= memory.memory[address + 3] << 24;
     }
-    
-    if(bit_22)
-    {
+
+    if (bit_22) {
         memory.memory[address] = Rm_value & 0xFF;
     }
-    else
-    {
+    else {
         memory.memory[address] = Rm_value & 0xFF;
         memory.memory[address + 1] = (Rm_value >> 8) & 0xFF;
         memory.memory[address + 2] = (Rm_value >> 16) & 0xFF;
         memory.memory[address + 3] = (Rm_value >> 24) & 0xFF;
+    }
+}
+
+void GBA::CPU::callBlockDataTransferInstruction(uint32_t instruction_code) {
+    if (!checkCondition(instruction_code))
+        return;
+
+    BlockDataTransferArguments arguments = decodeBlockDataTransferInstruction(instruction_code);
+    if (arguments.L == 0b1) {
+        ldmArm(arguments);
+    }
+    else {
+        stmArm(arguments);
+    }
+    // TODO: what does forcing user mode do?
+    /*
+    if (arguments.S == 0b0) {
+        // do not load PSR or force user mode
+    }
+    else {
+        // load PSR or force user mode
+    }*/
+}
+
+GBA::BlockDataTransferArguments GBA::CPU::decodeBlockDataTransferInstruction(uint32_t instruction_code) {
+    BlockDataTransferArguments arguments;
+    arguments.P = (instruction_code >> 24) & 0x1;     // Pre/Post indexing bit
+    arguments.U = (instruction_code >> 23) & 0x1;     // Up/Down bit
+    arguments.S = (instruction_code >> 22) & 0x1;     // program status register & force user bit
+    arguments.W = (instruction_code >> 21) & 0x1;     // write-back bit
+    arguments.L = (instruction_code >> 20) & 0x1;     // Load/Store bit
+    arguments.Rn = (instruction_code >> 16) & 0xF;    // Base register
+    arguments.registers = instruction_code & 0xFFFF;  // Register list bitfield
+    return arguments;
+}
+
+void GBA::CPU::ldmArm(GBA::BlockDataTransferArguments arguments) {
+    uint32_t address = R(arguments.Rn) & 0xFFFFFFE0;  // address must be word-aligned
+    for (uint32_t i = 0; i < 15; i++) {
+        if ((arguments.registers & (0b1 << i)) != 0) {
+            if (arguments.S == 0b0) {
+                R(i) = memory.memory[address];
+                R(i) |= memory.memory[address + 1] << 8;
+                R(i) |= memory.memory[address + 2] << 16;
+                R(i) |= memory.memory[address + 3] << 24;
+            }
+            else {
+                R_USRSYS(i) = memory.memory[address];
+                R_USRSYS(i) |= memory.memory[address + 1] << 8;
+                R_USRSYS(i) |= memory.memory[address + 2] << 16;
+                R_USRSYS(i) |= memory.memory[address + 3] << 24;
+            }
+            if (arguments.U == 0b1) {
+                address += 4;
+            }
+            else {
+                address -= 4;
+            }
+        }
+    }
+    if ((arguments.registers & (0b1 << 15)) != 0) {
+        PC() = memory.memory[address];
+        PC() |= memory.memory[address + 1] << 8;
+        PC() |= memory.memory[address + 2] << 16;
+        PC() |= memory.memory[address + 3] << 24;
+        if (arguments.S == 0b1) {  // mode change
+            switch (getMode()) {
+            case Mode::User:
+            case Mode::System:
+                break;
+            case Mode::FastInterrupt:
+                CPSR = SPSR_FIQ;
+                break;
+            case Mode::Supervisor:
+                CPSR = SPSR_SVC;
+                break;
+            case Mode::Abort:
+                CPSR = SPSR_ABT;
+                break;
+            case Mode::Interrupt:
+                CPSR = SPSR_IRQ;
+                break;
+            case Mode::Undefined:
+                CPSR = SPSR_UND;
+                break;
+            default:
+                throw;
+            }
+        }
+    }
+}
+
+void GBA::CPU::stmArm(GBA::BlockDataTransferArguments arguments) {
+    uint32_t address = R(arguments.Rn) & 0xFFFFFFE0;  // check this
+    for (uint32_t i = 0; i < 16; i++) {
+        if ((arguments.registers & (0b1 << i)) != 0) {
+            if (arguments.S == 0b0) {
+                memory.memory[address] = R(i) & 0xFF;
+                memory.memory[address + 1] = (R(i) >> 8) & 0xFF;
+                memory.memory[address + 2] = (R(i) >> 16) & 0xFF;
+                memory.memory[address + 3] = (R(i) >> 24) & 0xFF;
+            }
+            else {  // User bank transfer
+                memory.memory[address] = R_USRSYS(i) & 0xFF;
+                memory.memory[address + 1] = (R_USRSYS(i) >> 8) & 0xFF;
+                memory.memory[address + 2] = (R_USRSYS(i) >> 16) & 0xFF;
+                memory.memory[address + 3] = (R_USRSYS(i) >> 24) & 0xFF;
+            }
+            if (arguments.U == 0b1) {
+                address += 4;
+            }
+            else {
+                address -= 4;
+            }
+        }
     }
 }
 
@@ -966,6 +1103,46 @@ const uint32_t& GBA::CPU::PC() const {
 }
 
 uint32_t& GBA::CPU::R(uint32_t index) {
+    switch (getMode()) {
+    case Mode::User:
+    case Mode::System:
+        return R_USRSYS(index);
+    case Mode::FastInterrupt:
+        return R_FIQ(index);
+    case Mode::Supervisor:
+        return R_SVC(index);
+    case Mode::Abort:
+        return R_ABT(index);
+    case Mode::Interrupt:
+        return R_IRQ(index);
+    case Mode::Undefined:
+        return R_UND(index);
+    default:
+        throw;
+    }
+}
+
+const uint32_t& GBA::CPU::R(uint32_t index) const {
+    switch (getMode()) {
+    case Mode::User:
+    case Mode::System:
+        return R_USRSYS(index);
+    case Mode::FastInterrupt:
+        return R_FIQ(index);
+    case Mode::Supervisor:
+        return R_SVC(index);
+    case Mode::Abort:
+        return R_ABT(index);
+    case Mode::Interrupt:
+        return R_IRQ(index);
+    case Mode::Undefined:
+        return R_UND(index);
+    default:
+        throw;
+    }
+}
+
+uint32_t& GBA::CPU::R_USRSYS(uint32_t index) {
     // TODO: error handling
     if (index > 15) {
         throw;
@@ -973,7 +1150,7 @@ uint32_t& GBA::CPU::R(uint32_t index) {
     return registers[index];
 }
 
-const uint32_t& GBA::CPU::R(uint32_t index) const {
+const uint32_t& GBA::CPU::R_USRSYS(uint32_t index) const {
     // TODO: error handling
     if (index > 15) {
         throw;

@@ -128,7 +128,7 @@ int main(int argc, char** argv) {
                 break;
             }
         }
-        // TODO: emulate n instructions
+        // TODO: emulate n instructions (advance N clock cycles?)
         SDL_RenderClear(renderer);
         // TODO: render
         SDL_RenderPresent(renderer);
