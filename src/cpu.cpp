@@ -994,6 +994,60 @@ void GBA::CPU::stmArm(GBA::BlockDataTransferArguments arguments) {
     }
 }
 
+void GBA::CPU::bxArm(uint32_t instruction_code){
+    uint32_t Rn = R(instruction_code & 0xF);
+    PC() = Rn;
+    if (Rn & 0x1)
+        CPSR |= (1 << 5);
+    else
+        CPSR &= ~(1 << 5);
+}
+
+void GBA::CPU::callBranchAndExchangeInstruction(uint32_t instruction_code) {
+    if (!checkCondition(instruction_code))
+        return;
+
+    bxArm(instruction_code);
+}
+
+void GBA::CPU::blArm(uint32_t instruction_code)
+{
+    uint32_t offset = instruction_code & 0xFFFFFF;
+    if (offset & 0x800000)  // sign extend to 32 bits
+        offset |= 0xFF000000;
+
+                        // TODO: check if this is correct
+    R(14) = PC() - 4;   // This is because the PC is 8 bytes ahead (due to the prefetch) 
+                        // at the time of execution, and the next instruction is 4 bytes ahead of the current instruction
+                        // this is how it works normally but I am not sure about our case.
+    PC() += offset << 2;
+
+    PC() -= 8; // TODO check if correct I think it is because PC is 8 bytes ahead due to prefetch
+}
+
+void GBA::CPU::bArm(uint32_t instruction_code)
+{
+    int32_t offset = instruction_code & 0xFFFFFF;
+    if (offset & 0x800000)  // sign extend to 32 bits
+        offset |= 0xFF000000;
+    
+    PC() += offset << 2;
+
+    PC() -= 8; // TODO check if correct I think it is because PC is 8 bytes ahead due to prefetch
+}
+
+void GBA::CPU::callBranchInstruction(uint32_t instruction_code) {
+    if (!checkCondition(instruction_code))
+        return;
+
+    if((instruction_code >> 24) & 0x1){
+        blArm(instruction_code);
+    }
+    else{
+        bArm(instruction_code);
+    }
+}
+
 uint32_t& GBA::CPU::SP(GBA::CPU::Mode mode) {
     if (mode == GBA::CPU::Mode::User || mode == GBA::CPU::Mode::System) {
         return registers[static_cast<int>(GBA::CPU::RegisterIndex::SP)];

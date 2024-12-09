@@ -95,6 +95,13 @@ class CPU
     void ldmArm(BlockDataTransferArguments arguments);
     void stmArm(BlockDataTransferArguments arguments);
 
+    void callBranchAndExchangeInstruction(uint32_t instruction_code);
+    void bxArm(uint32_t instruction_code);
+
+    void callBranchInstruction(uint32_t instruction_code);
+    void bArm(uint32_t instruction_code);
+    void blArm(uint32_t instruction_code);
+
     // Stack Pointer, R13 by convention
     uint32_t& SP(Mode mode);
     const uint32_t& SP(Mode mode) const;
