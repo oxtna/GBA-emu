@@ -42,7 +42,7 @@ void GBA::CPU::step() {
         callSingleDataSwapInstruction(instruction_code);
         break;
     case InstructionType::BranchAndExchange:
-        // call(instruction_code);
+        callBranchAndExchangeInstruction(instruction_code);
         break;
     case InstructionType::HalfwordDataTransferRegister:
     case InstructionType::HalfwordDataTransferImmediate:
@@ -55,7 +55,7 @@ void GBA::CPU::step() {
         callBlockDataTransferInstruction(instruction_code);
         break;
     case InstructionType::Branch:
-        // call(instruction_code);
+        callBranchInstruction(instruction_code);
         break;
     case InstructionType::CoprocessorDataTransfer:
         // call(instruction_code);
@@ -76,6 +76,87 @@ void GBA::CPU::step() {
         throw;
     }
 }
+
+//16-bit Thumb instructions types
+
+constexpr bool isAddSubstractThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF800) == 0x1800;
+}
+
+constexpr bool isMoveShiftedRegisterThumb(uint16_t instruction_code){
+    return (instruction_code & 0xE000) == 0x0000;
+}
+
+constexpr bool isMoveCompareAddSubtractImmediateThumb(uint16_t instruction_code){
+    return (instruction_code & 0xE000) == 0x2000;
+}
+
+constexpr bool isAluOperationThumb(uint16_t instruction_code){
+    return (instruction_code & 0xFC00) == 0x4000;
+}
+
+constexpr bool isHiRegisterOperationsBranchExchangeThumb(uint16_t instruction_code){
+    return (instruction_code & 0xFC00) == 0x4400;
+}
+
+constexpr bool isPCRelativeLoadThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF800) == 0x4800;
+}
+
+constexpr bool isLoadStoreWithRegisterOffsetThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF200) == 0x5000;
+}
+
+constexpr bool isLoadStoreSignByteHalfwordThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF200) == 0x5200;
+}
+
+constexpr bool isLoadStoreImmediateOffsetThumb(uint16_t instruction_code){
+    return (instruction_code & 0xE000) == 0x6000;
+}
+
+constexpr bool isLoadStoreHalfwordThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF000) == 0x8000;
+}
+
+constexpr bool isSPRelativeLoadStoreThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF000) == 0x9000;
+}
+
+constexpr bool isLoadAddressThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF000) == 0xA000;
+}
+
+constexpr bool isAddOffsetToStackPointerThumb(uint16_t instruction_code){
+    return (instruction_code & 0xFF00) == 0xB000;
+}
+
+constexpr bool isPushPopRegistersThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF600) == 0xB400;
+}
+
+constexpr bool isMultipleLoadStoreThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF000) == 0xC000;
+}
+
+constexpr bool isSoftwareInterruptThumb(uint16_t instruction_code){
+    return (instruction_code & 0xFF00) == 0xDF00;
+}
+
+constexpr bool isConditionalBranchThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF000) == 0xD000;
+}
+
+constexpr bool isUnconditionalBranchThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF800) == 0xE000;
+}
+
+constexpr bool isLongBranchLinkThumb(uint16_t instruction_code){
+    return (instruction_code & 0xF000) == 0xF000;
+}
+
+
+//32-bit ARM instructions types
 
 constexpr bool isBranchAndExchange(uint32_t instruction_code) {
     return (instruction_code & 0x0FFFFFF0) == 0x012FFF10;
@@ -1046,6 +1127,49 @@ void GBA::CPU::callBranchInstruction(uint32_t instruction_code) {
     else{
         bArm(instruction_code);
     }
+}
+
+GBA::ThumbInstructionType GBA::CPU::decodeThumb(uint16_t instruction_code) {
+    if(isAddSubstractThumb(instruction_code))
+        return GBA::ThumbInstructionType::AddSubtract;
+    if(isMoveShiftedRegisterThumb(instruction_code))
+        return GBA::ThumbInstructionType::MoveShiftedRegister;
+    if(isMoveCompareAddSubtractImmediateThumb(instruction_code))
+        return GBA::ThumbInstructionType::MoveCompareAddSubtractImmediate;
+    if(isAluOperationThumb(instruction_code))
+        return GBA::ThumbInstructionType::ALUOperation;
+    if(isHiRegisterOperationsBranchExchangeThumb(instruction_code))
+        return GBA::ThumbInstructionType::HighRegisterOperationBranchExchange;
+    if(isPCRelativeLoadThumb(instruction_code))
+        return GBA::ThumbInstructionType::PCRelativeLoad;
+    if(isLoadStoreWithRegisterOffsetThumb(instruction_code))
+        return GBA::ThumbInstructionType::LoadStoreRegOffset;
+    if(isLoadStoreSignByteHalfwordThumb(instruction_code))
+        return GBA::ThumbInstructionType::LoadStoreSignByteHalfword;
+    if(isLoadStoreImmediateOffsetThumb(instruction_code))
+        return GBA::ThumbInstructionType::LoadStoreImmediateOffset;
+    if(isLoadStoreHalfwordThumb(instruction_code))
+        return GBA::ThumbInstructionType::LoadStoreHalfword;
+    if(isSPRelativeLoadStoreThumb(instruction_code))
+        return GBA::ThumbInstructionType::SPRelativeLoadStore;
+    if(isLoadAddressThumb(instruction_code))
+        return GBA::ThumbInstructionType::LoadAddress;
+    if(isAddOffsetToStackPointerThumb(instruction_code))
+        return GBA::ThumbInstructionType::AddOffsetToStackPointer;
+    if(isPushPopRegistersThumb(instruction_code))
+        return GBA::ThumbInstructionType::PushPopRegisters;
+    if(isMultipleLoadStoreThumb(instruction_code))
+        return GBA::ThumbInstructionType::MultipleLoadStore;
+    if(isSoftwareInterruptThumb(instruction_code))
+        return GBA::ThumbInstructionType::SoftwareInterrupt;
+    if(isConditionalBranchThumb(instruction_code))
+        return GBA::ThumbInstructionType::ConditionalBranch;
+    if(isUnconditionalBranchThumb(instruction_code))
+        return GBA::ThumbInstructionType::UnconditionalBranch;
+    if(isLongBranchLinkThumb(instruction_code))
+        return GBA::ThumbInstructionType::LongBranchLink;
+
+    return GBA::ThumbInstructionType::Undefined;
 }
 
 uint32_t& GBA::CPU::SP(GBA::CPU::Mode mode) {

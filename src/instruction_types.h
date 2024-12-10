@@ -25,6 +25,29 @@ enum class InstructionType {
     Undefined,
 };
 
+enum class ThumbInstructionType {
+    MoveShiftedRegister,
+    AddSubtract,
+    MoveCompareAddSubtractImmediate,
+    ALUOperation,
+    HighRegisterOperationBranchExchange,
+    PCRelativeLoad,
+    LoadStoreRegOffset,
+    LoadStoreSignByteHalfword,
+    LoadStoreImmediateOffset,
+    LoadStoreHalfword,
+    SPRelativeLoadStore,
+    LoadAddress,
+    AddOffsetToStackPointer,
+    PushPopRegisters,
+    MultipleLoadStore,
+    ConditionalBranch,
+    SoftwareInterrupt,
+    UnconditionalBranch,
+    LongBranchLink,
+    Undefined,
+};
+
 constexpr const char* getInstructionTypeText(InstructionType instruction_type) {
     switch (instruction_type) {
     case InstructionType::DataProcessing:

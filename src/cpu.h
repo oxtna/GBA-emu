@@ -102,6 +102,8 @@ class CPU
     void bArm(uint32_t instruction_code);
     void blArm(uint32_t instruction_code);
 
+    ThumbInstructionType decodeThumb(uint16_t instruction_code);
+
     // Stack Pointer, R13 by convention
     uint32_t& SP(Mode mode);
     const uint32_t& SP(Mode mode) const;
