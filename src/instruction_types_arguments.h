@@ -13,6 +13,9 @@ struct DataProcessingArguments
     uint32_t shifted_value;
     uint32_t shift_value;
     ShiftType shift_type;
+    DataProcessingArguments() = default;
+    DataProcessingArguments(bool S, uint32_t _Rd, uint32_t _Rn, uint32_t _shifted_value, uint32_t _shift_value, ShiftType _shift_type)
+        : S(S), Rn(_Rn), Rd(_Rd), shifted_value(_shifted_value), shift_value(_shift_value), shift_type(_shift_type) {};
 };
 
 struct MultiplyArguments
@@ -23,6 +26,10 @@ struct MultiplyArguments
     uint32_t Rn;
     uint32_t Rs;
     uint32_t Rm;
+
+    MultiplyArguments() = default;
+    MultiplyArguments(bool _S, bool _A, uint32_t _Rd, uint32_t _Rn, uint32_t _Rs, uint32_t _Rm)
+        : A(_A), S(_S), Rd(_Rd), Rn(_Rn), Rs(_Rs), Rm(_Rm) {};
 };
 
 struct MultiplyLongArguments
@@ -113,6 +120,31 @@ struct CoprocessorRegisterTransfersArguments
     uint32_t C_Rm;
 };
 
-}
+struct MoveShifterRegisterThumbArguments{
+    uint32_t Rd;
+    uint32_t Rs;
+    uint32_t shift_value;
+    ShiftType shift_type;
+};
 
+struct AddSubtractThumbArguments{
+    bool I;  // immediate bit
+    bool op;
+    uint32_t Rd;
+    uint32_t Rs;
+    uint32_t operand2;
+};
+
+struct MoveCompareAddSubtractImmediateThumbArguments{
+    uint32_t Rd;
+    uint32_t op;
+    uint32_t offset;
+};
+
+struct ALUoperationThumbArguments{
+    uint32_t Rd;
+    uint32_t Rs;
+    uint32_t op;
+};
+}
 #endif

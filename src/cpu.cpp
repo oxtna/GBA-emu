@@ -479,13 +479,13 @@ void GBA::CPU::teqArm(DataProcessingArguments arguments) {
 void GBA::CPU::cmpArm(DataProcessingArguments arguments) {
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     uint32_t result = R(arguments.Rn) - operand2.first;
-    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, R(arguments.Rn), arguments.Rd, result);
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, R(arguments.Rn), arguments.Rd, result); // TODO check if arguments.Rd should be arguments.Rn
 }
 
 void GBA::CPU::cmnArm(DataProcessingArguments arguments) {
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     uint32_t result = R(arguments.Rn) + operand2.first;
-    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, R(arguments.Rn), arguments.Rd, result);
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, R(arguments.Rn), arguments.Rd, result); // TODO check if arguments.Rd should be arguments.Rn
 }
 
 void GBA::CPU::orrArm(DataProcessingArguments arguments) {
@@ -579,29 +579,42 @@ GBA::MultiplyArguments GBA::CPU::decodeMultiplyArguments(uint32_t instruction_co
     return arguments;
 }
 
-void GBA::CPU::callMultiplyInstruction(uint32_t instruction_code) {
-    if (!checkCondition(instruction_code))
-        return;
-
-    GBA::MultiplyArguments arguments = decodeMultiplyArguments(instruction_code);
-    if (arguments.A)
-        R(arguments.Rd) = R(arguments.Rm) * R(arguments.Rs) + R(arguments.Rn);
-    else
-        R(arguments.Rd) = R(arguments.Rm) * R(arguments.Rs);
-
-    if (arguments.S && arguments.Rd != 15) {
-        if (R(arguments.Rd) & (1 << 31))
+void GBA::CPU::multiplyArmFlagSetting(bool S, uint32_t Rd) {
+    if (S && Rd != 15) {
+        if (R(Rd) & (1 << 31))
             CPSR |= (1 << 31);
         else
             CPSR &= ~(1 << 31);
 
-        if (R(arguments.Rd) == 0)
+        if (R(Rd) == 0)
             CPSR |= (1 << 30);
         else
             CPSR &= ~(1 << 30);
 
         CPSR &= ~(1 << 29);  // Clearing carry flag it instruction says it should be set to meaningless value
     }
+}
+
+void GBA::CPU::mulArm(MultiplyArguments arguments) {
+
+    R(arguments.Rd) = R(arguments.Rm) * R(arguments.Rs);
+    multiplyArmFlagSetting(arguments.S, arguments.Rd);
+}
+
+void GBA::CPU::mlaArm(MultiplyArguments arguments) {
+    R(arguments.Rd) = R(arguments.Rm) * R(arguments.Rs) + R(arguments.Rn);
+    multiplyArmFlagSetting(arguments.S, arguments.Rd);
+}
+
+void GBA::CPU::callMultiplyInstruction(uint32_t instruction_code) {
+    if (!checkCondition(instruction_code))
+        return;
+
+    GBA::MultiplyArguments arguments = decodeMultiplyArguments(instruction_code);
+    if (arguments.A)
+        mlaArm(arguments);
+    else
+        mulArm(arguments);
 }
 
 GBA::MultiplyLongArguments GBA::CPU::decodeMultiplyLongArguments(uint32_t instruction_code) {
@@ -1170,6 +1183,223 @@ GBA::ThumbInstructionType GBA::CPU::decodeThumb(uint16_t instruction_code) {
         return GBA::ThumbInstructionType::LongBranchLink;
 
     return GBA::ThumbInstructionType::Undefined;
+}
+
+GBA::MoveShifterRegisterThumbArguments GBA::CPU::decodeMoveShiftedRegisterThumbArguments(uint16_t instruction_code){
+    GBA::MoveShifterRegisterThumbArguments arguments;
+    arguments.Rd = instruction_code & 0x7;
+    arguments.Rs = (instruction_code >> 3) & 0x7;
+    arguments.shift_type = static_cast<GBA::ShiftType>((instruction_code >> 11) & 0x3);
+    arguments.shift_value = (instruction_code >> 6) & 0x1F;
+    return arguments;
+}
+
+void GBA::CPU::lslThumb(MoveShifterRegisterThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, 0, R(arguments.Rs), arguments.shift_value, GBA::ShiftType::LogicalLeft);
+    movArm(data_processing_arguments);
+}
+
+void GBA::CPU::lsrThumb(MoveShifterRegisterThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, 0, R(arguments.Rs), arguments.shift_value, GBA::ShiftType::LogicalRight);
+    movArm(data_processing_arguments);
+}
+
+void GBA::CPU::asrThumb(MoveShifterRegisterThumbArguments arguments){
+
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, 0, R(arguments.Rs), arguments.shift_value, GBA::ShiftType::ArithmeticRight);
+    movArm(data_processing_arguments);
+}
+
+
+void GBA::CPU::callMoveShiftedRegisterThumbInstruction(uint16_t instruction_code){
+    MoveShifterRegisterThumbArguments arguments = decodeMoveShiftedRegisterThumbArguments(instruction_code);
+    if(arguments.shift_type == GBA::ShiftType::LogicalLeft)
+        lslThumb(arguments);
+    else if(arguments.shift_type == GBA::ShiftType::LogicalRight)
+        lsrThumb(arguments);
+    else if(arguments.shift_type == GBA::ShiftType::ArithmeticRight)
+        asrThumb(arguments);
+    else
+        return; // TODO: invalid shift type error handling
+}
+
+GBA::AddSubtractThumbArguments GBA::CPU::decodeAddSubtractThumbArguments(uint16_t instruction_code){
+    GBA::AddSubtractThumbArguments arguments;
+    arguments.Rd = instruction_code & 0x7;
+    arguments.Rs = (instruction_code >> 3) & 0x7;
+    arguments.operand2 = (instruction_code >> 6) & 0x7;
+    arguments.I = (instruction_code >> 10) & 0x1;
+    arguments.op = (instruction_code >> 9) & 0x1; 
+    return arguments;
+}
+
+void GBA::CPU::addThumb(AddSubtractThumbArguments arguments){
+    if(arguments.I)
+    {
+        DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rs, arguments.operand2, 0, GBA::ShiftType::LogicalLeft);
+        addArm(data_processing_arguments);
+    }
+    else
+    {
+        DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rs, R(arguments.operand2), 0, GBA::ShiftType::LogicalLeft);
+        addArm(data_processing_arguments);
+    }
+}
+
+void GBA::CPU::subThumb(AddSubtractThumbArguments arguments){
+    if(arguments.I)
+    {
+        DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rs, arguments.operand2, 0, GBA::ShiftType::LogicalLeft);
+        subArm(data_processing_arguments);
+    }
+    else
+    {
+        DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rs, R(arguments.operand2), 0, GBA::ShiftType::LogicalLeft);
+        subArm(data_processing_arguments);
+    }
+}
+
+void GBA::CPU::callAddSubtractThumbInstruction(uint16_t instruction_code){
+    AddSubtractThumbArguments arguments = decodeAddSubtractThumbArguments(instruction_code);
+    if(arguments.op)
+        addThumb(arguments);
+    else
+        subThumb(arguments);
+}
+
+GBA::MoveCompareAddSubtractImmediateThumbArguments GBA::CPU::decodeMoveCompareAddSubtractImmediateThumbArguments(uint16_t instruction_code){
+    GBA::MoveCompareAddSubtractImmediateThumbArguments arguments;
+    arguments.Rd = (instruction_code >> 8) & 0x7;
+    arguments.op = (instruction_code >> 11) & 0x3;
+    arguments.offset = instruction_code & 0xFF;
+    return arguments;
+}
+
+void GBA::CPU::movThumb(MoveCompareAddSubtractImmediateThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, 0, arguments.offset, 0, GBA::ShiftType::LogicalLeft);
+    movArm(data_processing_arguments);
+}
+
+void GBA::CPU::cmpThumb(MoveCompareAddSubtractImmediateThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, 0, arguments.Rd, arguments.offset, 0, GBA::ShiftType::LogicalLeft);
+    cmpArm(data_processing_arguments);
+}
+
+void GBA::CPU::addThumb(MoveCompareAddSubtractImmediateThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rd, arguments.offset, 0, GBA::ShiftType::LogicalLeft);
+    addArm(data_processing_arguments);
+}
+
+void GBA::CPU::subThumb(MoveCompareAddSubtractImmediateThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rd, arguments.offset, 0, GBA::ShiftType::LogicalLeft);
+    subArm(data_processing_arguments);
+}
+
+void GBA::CPU::callMoveCompareAddSubtractImmediateThumbInstruction(uint16_t instruction_code){
+    MoveCompareAddSubtractImmediateThumbArguments arguments = decodeMoveCompareAddSubtractImmediateThumbArguments(instruction_code);
+    if(arguments.op == 0b00)
+        movThumb(arguments);
+    else if(arguments.op == 0b01)
+        cmpThumb(arguments);
+    else if(arguments.op == 0b10)
+        addThumb(arguments);
+    else if(arguments.op == 0b11)
+        subThumb(arguments);
+    else
+        return; // TODO: invalid op error handling
+}
+
+GBA::ALUoperationThumbArguments GBA::CPU::decodeALUOperationThumbArguments(uint16_t instruction_code)
+{
+    ALUoperationThumbArguments arguments;
+    arguments.Rd = instruction_code & 0x7;
+    arguments.Rs = (instruction_code >> 3) & 0x7;
+    arguments.op = (instruction_code >> 6) & 0xF;
+    return arguments;
+}
+
+void GBA::CPU::andThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rd, R(arguments.Rs), 0, GBA::ShiftType::LogicalLeft);
+    andArm(data_processing_arguments);
+}
+
+void GBA::CPU::xorThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rd, R(arguments.Rs), 0, GBA::ShiftType::LogicalLeft);
+    xorArm(data_processing_arguments);
+}
+
+void GBA::CPU::lslThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, 0, R(arguments.Rd), R(arguments.Rs), GBA::ShiftType::LogicalLeft);
+    movArm(data_processing_arguments);
+}
+
+void GBA::CPU::lsrThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, 0, R(arguments.Rd), R(arguments.Rs), GBA::ShiftType::LogicalRight);
+    movArm(data_processing_arguments);
+}
+
+void GBA::CPU::asrThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, 0, R(arguments.Rd), R(arguments.Rs), GBA::ShiftType::ArithmeticRight);
+    movArm(data_processing_arguments);
+}
+
+void GBA::CPU::adcThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rd, R(arguments.Rs), 0, GBA::ShiftType::LogicalLeft);
+    adcArm(data_processing_arguments);
+}
+
+void GBA::CPU::sbcThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rd, R(arguments.Rs), 0, GBA::ShiftType::LogicalLeft);
+    sbcArm(data_processing_arguments);
+}
+
+void GBA::CPU::rorThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, 0, R(arguments.Rd), R(arguments.Rs), GBA::ShiftType::RotateRight);
+    movArm(data_processing_arguments);
+}
+
+void GBA::CPU::tstThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, 0, arguments.Rd, R(arguments.Rs), 0, GBA::ShiftType::LogicalLeft);
+    tstArm(data_processing_arguments);
+}
+
+void GBA::CPU::negThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rs, 0, 0, GBA::ShiftType::LogicalLeft);
+    rsbArm(data_processing_arguments);
+}
+
+void GBA::CPU::cmpThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, 0, arguments.Rd, R(arguments.Rs), 0, GBA::ShiftType::LogicalLeft);
+    cmpArm(data_processing_arguments);
+}
+
+void GBA::CPU::cmnThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, 0, arguments.Rd, R(arguments.Rs), 0, GBA::ShiftType::LogicalLeft);
+    cmnArm(data_processing_arguments);
+}
+
+void GBA::CPU::orrThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rd, R(arguments.Rs), 0, GBA::ShiftType::LogicalLeft);
+    orrArm(data_processing_arguments);
+}
+
+void GBA::CPU::mulThumb(ALUoperationThumbArguments arguments){
+    MultiplyArguments data_processing_arguments(1, 0, arguments.Rd, 0, arguments.Rs, arguments.Rd);
+    mulArm(data_processing_arguments);
+}
+
+void GBA::CPU::bicThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, arguments.Rd, R(arguments.Rs), 0, GBA::ShiftType::LogicalLeft);
+    bicArm(data_processing_arguments);
+}
+
+void GBA::CPU::mvnThumb(ALUoperationThumbArguments arguments){
+    DataProcessingArguments data_processing_arguments(1, arguments.Rd, 0, R(arguments.Rs), 0, GBA::ShiftType::LogicalLeft);
+    mvnArm(data_processing_arguments);
+}
+
+void GBA::CPU::callALUOperationThumbInstruction(uint16_t instruction_code){
+    ALUoperationThumbArguments arguments = decodeALUOperationThumbArguments(instruction_code);
 }
 
 uint32_t& GBA::CPU::SP(GBA::CPU::Mode mode) {

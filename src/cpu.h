@@ -67,6 +67,9 @@ class CPU
 
     void callMultiplyInstruction(uint32_t intruction_code);
     MultiplyArguments decodeMultiplyArguments(uint32_t instruction_code);
+    void mulArm(MultiplyArguments arguments);
+    void mlaArm(MultiplyArguments arguments);
+    void multiplyArmFlagSetting(bool S, uint32_t Rd);
 
     void callMultiplyLongInstruction(uint32_t instruction_code);
     MultiplyLongArguments decodeMultiplyLongArguments(uint32_t instruction_code);
@@ -103,6 +106,44 @@ class CPU
     void blArm(uint32_t instruction_code);
 
     ThumbInstructionType decodeThumb(uint16_t instruction_code);
+
+    void callMoveShiftedRegisterThumbInstruction(uint16_t instruction_code);
+    MoveShifterRegisterThumbArguments decodeMoveShiftedRegisterThumbArguments(uint16_t instruction_code);
+    void lslThumb(MoveShifterRegisterThumbArguments arguments);
+    void lsrThumb(MoveShifterRegisterThumbArguments arguments);
+    void asrThumb(MoveShifterRegisterThumbArguments arguments);
+
+    void callAddSubtractThumbInstruction(uint16_t instruction_code);
+    AddSubtractThumbArguments decodeAddSubtractThumbArguments(uint16_t instruction_code);
+    void addThumb(AddSubtractThumbArguments arguments);
+    void subThumb(AddSubtractThumbArguments arguments);
+
+    void callMoveCompareAddSubtractImmediateThumbInstruction(uint16_t instruction_code);
+    MoveCompareAddSubtractImmediateThumbArguments decodeMoveCompareAddSubtractImmediateThumbArguments(uint16_t instruction_code);
+    void movThumb(MoveCompareAddSubtractImmediateThumbArguments arguments);
+    void cmpThumb(MoveCompareAddSubtractImmediateThumbArguments arguments);
+    void addThumb(MoveCompareAddSubtractImmediateThumbArguments arguments);
+    void subThumb(MoveCompareAddSubtractImmediateThumbArguments arguments);
+
+    void callALUOperationThumbInstruction(uint16_t instruction_code);
+    ALUoperationThumbArguments decodeALUOperationThumbArguments(uint16_t instruction_code);
+    void andThumb(ALUoperationThumbArguments arguments);
+    void xorThumb(ALUoperationThumbArguments arguments);
+    void lslThumb(ALUoperationThumbArguments arguments);
+    void lsrThumb(ALUoperationThumbArguments arguments);
+    void asrThumb(ALUoperationThumbArguments arguments);
+    void adcThumb(ALUoperationThumbArguments arguments);
+    void sbcThumb(ALUoperationThumbArguments arguments);
+    void rorThumb(ALUoperationThumbArguments arguments);
+    void tstThumb(ALUoperationThumbArguments arguments);
+    void negThumb(ALUoperationThumbArguments arguments);
+    void cmpThumb(ALUoperationThumbArguments arguments);
+    void cmnThumb(ALUoperationThumbArguments arguments);
+    void orrThumb(ALUoperationThumbArguments arguments);
+    void mulThumb(ALUoperationThumbArguments arguments);
+    void bicThumb(ALUoperationThumbArguments arguments);
+    void mvnThumb(ALUoperationThumbArguments arguments);
+
 
     // Stack Pointer, R13 by convention
     uint32_t& SP(Mode mode);
