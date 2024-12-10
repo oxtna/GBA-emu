@@ -144,6 +144,12 @@ class CPU
     void bicThumb(ALUoperationThumbArguments arguments);
     void mvnThumb(ALUoperationThumbArguments arguments);
 
+    void callHiRegisterOperationBranchExchangeInstruction(uint16_t instruction_code);
+    HiRegisterOperationsBranchExchangeArguments decodeHiRegisterOperationBranchExchangeArguments(uint16_t instruction_code);
+    void addHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
+    void cmpHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
+    void movHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
+    void bxHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
 
     // Stack Pointer, R13 by convention
     uint32_t& SP(Mode mode);

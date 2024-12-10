@@ -146,5 +146,13 @@ struct ALUoperationThumbArguments{
     uint32_t Rs;
     uint32_t op;
 };
+
+struct HiRegisterOperationsBranchExchangeArguments{
+    uint32_t H1;
+    uint32_t H2;
+    uint32_t Rd;
+    uint32_t Rs;
+    uint32_t op;
+};
 }
 #endif

@@ -1400,6 +1400,132 @@ void GBA::CPU::mvnThumb(ALUoperationThumbArguments arguments){
 
 void GBA::CPU::callALUOperationThumbInstruction(uint16_t instruction_code){
     ALUoperationThumbArguments arguments = decodeALUOperationThumbArguments(instruction_code);
+    if(arguments.op == 0b0000)
+        andThumb(arguments);
+    else if(arguments.op == 0b0001)
+        xorThumb(arguments);
+    else if(arguments.op == 0b0010)
+        lslThumb(arguments);
+    else if(arguments.op == 0b0011)
+        lsrThumb(arguments);
+    else if(arguments.op == 0b0100)
+        asrThumb(arguments);
+    else if(arguments.op == 0b0101)
+        adcThumb(arguments);
+    else if(arguments.op == 0b0110)
+        sbcThumb(arguments);
+    else if(arguments.op == 0b0111)
+        rorThumb(arguments);
+    else if(arguments.op == 0b1000)
+        tstThumb(arguments);
+    else if(arguments.op == 0b1001)
+        negThumb(arguments);
+    else if(arguments.op == 0b1010)
+        cmpThumb(arguments);
+    else if(arguments.op == 0b1011)
+        cmnThumb(arguments);
+    else if(arguments.op == 0b1100)
+        orrThumb(arguments);
+    else if(arguments.op == 0b1101)
+        mulThumb(arguments);
+    else if(arguments.op == 0b1110)
+        bicThumb(arguments);
+    else if(arguments.op == 0b1111)
+        mvnThumb(arguments);
+    else
+        return; // TODO: invalid op error handling
+}
+
+
+GBA::HiRegisterOperationsBranchExchangeArguments GBA::CPU::decodeHiRegisterOperationBranchExchangeArguments(uint16_t instruction_code){
+    HiRegisterOperationsBranchExchangeArguments arguments;
+    arguments.Rd = instruction_code & 0x7;
+    arguments.Rs = (instruction_code >> 3) & 0x7;
+    arguments.H1 = (instruction_code >> 6) & 0x1;
+    arguments.H2 = (instruction_code >> 7) & 0x1;
+    arguments.op = (instruction_code >> 8) & 0x3;
+    return arguments;
+}
+
+void GBA::CPU::addHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments){
+    uint32_t source_number, destination_number;
+    if(arguments.H1)
+        source_number = 8 + arguments.Rs;
+    else
+        source_number = arguments.Rs;
+    
+    if(arguments.H2)
+        destination_number = 8 + arguments.Rd;
+    else
+        destination_number = arguments.Rd;
+
+    R(destination_number) += R(source_number);
+}
+
+void GBA::CPU::cmpHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments){
+    uint32_t source_number, destination_number;
+    if(arguments.H1)
+        source_number = 8 + arguments.Rs;
+    else
+        source_number = arguments.Rs;
+    
+    if(arguments.H2)
+        destination_number = 8 + arguments.Rd;
+    else
+        destination_number = arguments.Rd;
+
+    uint32_t result = R(destination_number) - R(source_number);
+    if(result == 0)
+        CPSR |= 0x40000000;
+    else
+        CPSR &= ~0x40000000;
+}
+
+void GBA::CPU::movHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments){
+    uint32_t source_number, destination_number;
+    if(arguments.H1)
+        source_number = 8 + arguments.Rs;
+    else
+        source_number = arguments.Rs;
+    
+    if(arguments.H2)
+        destination_number = 8 + arguments.Rd;
+    else
+        destination_number = arguments.Rd;
+
+    R(destination_number) = R(source_number);
+}
+
+void GBA::CPU::bxHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments){
+    uint32_t source_number;
+    if(arguments.H1)
+        source_number = 8 + arguments.Rs;
+    else
+        source_number = arguments.Rs;
+
+    PC() = R(source_number);
+    if (PC() & 0x1)
+        CPSR |= 0x20;
+    else
+        CPSR &= ~0x20;
+}
+
+void GBA::CPU::callHiRegisterOperationBranchExchangeInstruction(uint16_t instruction_code)
+{
+    HiRegisterOperationsBranchExchangeArguments arguments = decodeHiRegisterOperationBranchExchangeArguments(instruction_code);
+    //TODO all functions called below need refactor current code temporary placeholder started writing it but need to find better solution
+    if(arguments.op == 0b00)
+        addHiRegisterOperationBranchExchange(arguments);
+    else if(arguments.op == 0b01)
+        cmpHiRegisterOperationBranchExchange(arguments);
+    else if(arguments.op == 0b10)
+        movHiRegisterOperationBranchExchange(arguments);
+    else if(arguments.op == 0b11)
+        bxHiRegisterOperationBranchExchange(arguments);
+    else
+        return; // TODO: invalid op error handling
+
+
 }
 
 uint32_t& GBA::CPU::SP(GBA::CPU::Mode mode) {
