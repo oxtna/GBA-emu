@@ -41,7 +41,7 @@ class CPU
     DataProcessingArguments decodeDataProcessingArguments(uint32_t instruction_code, Opcode opcode);
     void dataProcessingArmLogicalOperationFlagsSetting(bool S, uint32_t Rd, uint32_t operation_result, bool carry);
     void dataProcessingArmArithmeticOperationFlagsSetting(
-        bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result);
+        bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result, uint32_t operand1 ,uint32_t operand2, bool isAdd);
     void andArm(DataProcessingArguments arguments);
     void xorArm(DataProcessingArguments arguments);
     void subArm(DataProcessingArguments arguments);

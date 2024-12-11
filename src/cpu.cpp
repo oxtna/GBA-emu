@@ -356,7 +356,7 @@ void GBA::CPU::dataProcessingArmLogicalOperationFlagsSetting(
 }
 
 void GBA::CPU::dataProcessingArmArithmeticOperationFlagsSetting(
-    bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result) {
+    bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result, uint32_t operand1, uint32_t operand2, bool isAdd) {
     if (!S || Rd == 15)
         return;
 
@@ -370,8 +370,26 @@ void GBA::CPU::dataProcessingArmArithmeticOperationFlagsSetting(
     else
         CPSR &= ~(1 << 30);
 
-    // TODO: setting carry flag
-    // TODO: setting overflow flag
+
+    // setting carry flag
+    if(isAdd){
+        if(operand1 > 0xFFFFFFFF - operand2)
+            CPSR |= (1 << 29);
+        else
+            CPSR &= ~(1 << 29);
+    }
+    else{
+        if(operand1 < operand2)
+            CPSR |= (1 << 29);
+        else
+            CPSR &= ~(1 << 29);
+    }
+
+    // setting overflow flag
+    if(((operand1 ^ operand2) & (1 << 31)) == 0 && ((Rd_before_operation ^ result) & (1 << 31)) != 0) // + + = - or - - = + then overlow flag is set
+        CPSR |= (1 << 28);
+    else
+        CPSR &= ~(1 << 28);
 }
 
 std::pair<uint32_t, bool>
@@ -426,42 +444,42 @@ void GBA::CPU::subArm(DataProcessingArguments arguments) {
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = R(arguments.Rn) - operand2.first;
-    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd), R(arguments.Rn), operand2.first, false);
 }
 
 void GBA::CPU::rsbArm(DataProcessingArguments arguments) {
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = operand2.first - R(arguments.Rn);
-    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd), operand2.first, R(arguments.Rd), false);
 }
 
 void GBA::CPU::addArm(DataProcessingArguments arguments) {
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = R(arguments.Rn) + operand2.first;
-    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd), R(arguments.Rn), operand2.first, true);
 }
 
 void GBA::CPU::adcArm(DataProcessingArguments arguments) {
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = R(arguments.Rn) + operand2.first + ((CPSR >> 29) & 0x1);
-    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd), R(arguments.Rn), operand2.first, true);
 }
 
 void GBA::CPU::sbcArm(DataProcessingArguments arguments) {
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
-    R(arguments.Rd) = R(arguments.Rn) - operand2.first - ((CPSR >> 29) & 0x1);
-    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
+    R(arguments.Rd) = R(arguments.Rn) - operand2.first + ((CPSR >> 29) & 0x1) - 1;
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd), R(arguments.Rn), operand2.first, false);
 }
 
 void GBA::CPU::rscArm(DataProcessingArguments arguments) {
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
-    R(arguments.Rd) = operand2.first - R(arguments.Rn) - ((CPSR >> 29) & 0x1);
-    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd));
+    R(arguments.Rd) = operand2.first - R(arguments.Rn) + ((CPSR >> 29) & 0x1) - 1;
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, Rd_before_operation, arguments.Rd, R(arguments.Rd), operand2.first, R(arguments.Rd), false);
 }
 
 void GBA::CPU::tstArm(DataProcessingArguments arguments) {
@@ -479,13 +497,15 @@ void GBA::CPU::teqArm(DataProcessingArguments arguments) {
 void GBA::CPU::cmpArm(DataProcessingArguments arguments) {
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     uint32_t result = R(arguments.Rn) - operand2.first;
-    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, R(arguments.Rn), arguments.Rd, result); // TODO check if arguments.Rd should be arguments.Rn
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, R(arguments.Rn), arguments.Rd, result, R(arguments.Rn), operand2.first, false); 
+    // TODO check if arguments.Rd should be arguments.Rn
 }
 
 void GBA::CPU::cmnArm(DataProcessingArguments arguments) {
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     uint32_t result = R(arguments.Rn) + operand2.first;
-    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, R(arguments.Rn), arguments.Rd, result); // TODO check if arguments.Rd should be arguments.Rn
+    dataProcessingArmArithmeticOperationFlagsSetting(arguments.S, R(arguments.Rn), arguments.Rd, result, R(arguments.Rn), operand2.first, true); 
+    // TODO check if arguments.Rd should be arguments.Rn
 }
 
 void GBA::CPU::orrArm(DataProcessingArguments arguments) {
