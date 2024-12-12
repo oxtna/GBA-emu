@@ -67,6 +67,9 @@ struct HalfWordAndSignedDataTransferArguments
     uint32_t Rn;
     uint32_t Rd;
     uint32_t offset;
+    HalfWordAndSignedDataTransferArguments() = default;
+    HalfWordAndSignedDataTransferArguments(bool _P, bool _U, bool _W, bool _L, bool _S, bool _H, uint32_t _Rn, uint32_t _Rd, uint32_t _offset)
+        : P(_P), U(_U), W(_W), L(_L), S(_S), H(_H), Rn(_Rn), Rd(_Rd), offset(_offset) {};
 };
 
 struct BlockDataTransferArguments
@@ -78,6 +81,9 @@ struct BlockDataTransferArguments
     bool L;              // load/store bit
     uint32_t Rn;         // base register
     uint32_t registers;  // register list bitfield
+    BlockDataTransferArguments() = default;
+    BlockDataTransferArguments(bool _P, bool _U, bool _S, bool _W, bool _L, uint32_t _Rn, uint32_t _registers)
+        : P(_P), U(_U), S(_S), W(_W), L(_L), Rn(_Rn), registers(_registers) {};
 };
 
 struct SingleDataSwapArguments
@@ -153,6 +159,57 @@ struct HiRegisterOperationsBranchExchangeArguments{
     uint32_t Rd;
     uint32_t Rs;
     uint32_t op;
+};
+
+struct LoadStoreRegOffsetArguments{
+    bool B;  // byte/word bit
+    bool L;  // load/store bit
+    uint32_t Rd;
+    uint32_t Rb;
+    uint32_t Ro;
+};
+
+struct LoadStoreImmediateOffsetArguments{
+    bool B;  // byte/word bit
+    bool L;  // load/store bit
+    uint32_t Rb;
+    uint32_t Rd;
+    uint32_t offset;
+};
+
+struct LoadStoreSignExtendedByteHalfwordArguments{
+    bool H;  // halfword/byte bit
+    bool S;  // sign bit
+    uint32_t Rb;
+    uint32_t Rd;
+    uint32_t Ro;
+};
+
+struct LoadStoreHalfwordArguments{
+    bool L;  // load/store bit
+    uint32_t Rb;
+    uint32_t Rd;
+    uint32_t offset;
+};
+
+struct SPRelativeLoadStoreArguments{
+    bool L;  // load/store bit
+    uint32_t Rd;
+    uint32_t offset;
+
+};
+
+struct LoadAddressArguments{
+    uint32_t Rd;
+    uint32_t offset;
+    bool SP;
+};
+
+struct PushPopRegistersArguments{
+    bool R;  // register list bit
+    bool L;  // load/store bit
+    uint32_t Rlist;
+
 };
 }
 #endif

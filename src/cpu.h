@@ -151,6 +151,36 @@ class CPU
     void movHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
     void bxHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
 
+    void callPCRelativeLoad(uint16_t instruction_code);
+
+    void callLoadStoreRegOffset(uint16_t instruction_code);
+    LoadStoreRegOffsetArguments decodeLoadStoreRegOffsetArguments(uint16_t instruction_code);
+
+    void callLoadStoreImmediateOffset(uint16_t instruction_code);
+    LoadStoreImmediateOffsetArguments decodeLoadStoreImmediateOffsetArguments(uint16_t instruction_code);
+
+    void ldrThumb(uint32_t address, uint32_t Rd, bool B);
+    void strThumb(uint32_t address, uint32_t Rd, bool B);
+
+    void callLoadStoreSignExtendedByteHalfword(uint16_t instruction_code);
+    LoadStoreSignExtendedByteHalfwordArguments decodeLoadStoreSignExtendedByteHalfwordArguments(uint16_t instruction_code);
+
+    void callLoadStoreHalfword(uint16_t instruction_code);
+    LoadStoreHalfwordArguments decodeLoadStoreHalfwordArguments(uint16_t instruction_code);
+
+    void callSPRelativeLoadStore(uint16_t instruction_code);
+    SPRelativeLoadStoreArguments decodeSPRelativeLoadStoreArguments(uint16_t instruction_code);
+
+    void callLoadAddress(uint16_t instruction_code);
+    LoadAddressArguments decodeLoadAddressArguments(uint16_t instruction_code);
+
+    void callAddOffsetToStackPointer(uint16_t instruction_code);
+
+    void callPushPopRegisters(uint16_t instruction_code);
+    PushPopRegistersArguments decodePushPopRegistersArguments(uint16_t instruction_code);
+
+    void callMultipleLoadStore(uint16_t instruction_code);
+
     // Stack Pointer, R13 by convention
     uint32_t& SP(Mode mode);
     const uint32_t& SP(Mode mode) const;

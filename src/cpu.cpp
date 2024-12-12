@@ -1548,6 +1548,244 @@ void GBA::CPU::callHiRegisterOperationBranchExchangeInstruction(uint16_t instruc
 
 }
 
+void GBA::CPU::callPCRelativeLoad(uint16_t instruction_code){
+    uint32_t offset = (instruction_code & 0xFF) << 2;
+    uint32_t Rd = (instruction_code >> 8) & 0x7;
+    R(Rd) = memory.memory[PC() + offset]; // TODO check if maybe PC should be incremented by 4 or decrement by 4
+}
+
+GBA::LoadStoreRegOffsetArguments GBA::CPU::decodeLoadStoreRegOffsetArguments(uint16_t instruction_code){
+    LoadStoreRegOffsetArguments arguments;
+    arguments.Rd = instruction_code & 0x7;
+    arguments.Rb = (instruction_code >> 3) & 0x7;
+    arguments.Ro = (instruction_code >> 6) & 0x7;
+    arguments.B = (instruction_code >> 10) & 0x1;
+    arguments.L = (instruction_code >> 11) & 0x1;
+    return arguments;
+}
+
+void GBA::CPU::callLoadStoreRegOffset(uint16_t instruction_code){
+    LoadStoreRegOffsetArguments arguments = decodeLoadStoreRegOffsetArguments(instruction_code);
+    uint32_t address = R(arguments.Rb) + R(arguments.Ro);
+    if(arguments.L)
+        ldrThumb(address, arguments.Rd, arguments.B);
+    else
+        strThumb(address, arguments.Rd, arguments.B);
+}
+
+GBA::LoadStoreImmediateOffsetArguments GBA::CPU::decodeLoadStoreImmediateOffsetArguments(uint16_t instruction_code){
+    LoadStoreImmediateOffsetArguments arguments;
+    arguments.Rd = instruction_code & 0x7;
+    arguments.Rb = (instruction_code >> 3) & 0x7;
+    arguments.offset = (instruction_code >> 6) & 0x1F;  // not sure because these instructions transfer byte or word values between registers and memory using
+                                                        //an immediate 5 or 7-bit offset.
+    arguments.L = (instruction_code >> 11) & 0x1;
+    arguments.B = (instruction_code >> 12) & 0x1;
+    return arguments;
+}
+
+void GBA::CPU::callLoadStoreImmediateOffset(uint16_t instruction_code){
+    LoadStoreImmediateOffsetArguments arguments = decodeLoadStoreImmediateOffsetArguments(instruction_code);
+    uint32_t address = R(arguments.Rb) + arguments.offset;
+    if(arguments.L)
+        ldrThumb(address, arguments.Rd, arguments.B);
+    else
+        strThumb(address, arguments.Rd, arguments.B);
+}
+
+void GBA::CPU::ldrThumb(uint32_t address, uint32_t Rd, bool B){
+    if(B)
+    {
+        R(Rd) = memory.memory[address];
+    }
+    else
+    {
+        R(Rd) = memory.memory[address];
+        R(Rd) |= memory.memory[address + 1] << 8;
+        R(Rd) |= memory.memory[address + 2] << 16;
+        R(Rd) |= memory.memory[address + 3] << 24;
+    }
+}
+
+void GBA::CPU::strThumb(uint32_t address, uint32_t Rd, bool B){
+    if(B)
+    {
+        memory.memory[address] = R(Rd) & 0xFF;
+    }
+    else
+    {
+        memory.memory[address] = R(Rd) & 0xFF;
+        memory.memory[address + 1] = (R(Rd) >> 8) & 0xFF;
+        memory.memory[address + 2] = (R(Rd) >> 16) & 0xFF;
+        memory.memory[address + 3] = (R(Rd) >> 24) & 0xFF;
+    }
+}
+
+GBA::LoadStoreSignExtendedByteHalfwordArguments GBA::CPU::decodeLoadStoreSignExtendedByteHalfwordArguments(uint16_t instruction_code){
+    LoadStoreSignExtendedByteHalfwordArguments arguments;
+    arguments.Rd = instruction_code & 0x7;
+    arguments.Rb = (instruction_code >> 3) & 0x7;
+    arguments.Ro = (instruction_code >> 6) & 0x7;
+    arguments.S = (instruction_code >> 10) & 0x1;
+    arguments.H = (instruction_code >> 11) & 0x1;
+    return arguments;
+}
+
+void GBA::CPU::callLoadStoreSignExtendedByteHalfword(uint16_t instruction_code){
+    LoadStoreSignExtendedByteHalfwordArguments arguments = decodeLoadStoreSignExtendedByteHalfwordArguments(instruction_code);
+    uint32_t address = R(arguments.Rb) + R(arguments.Ro);
+    uint32_t S_H = arguments.S << 1 | arguments.H;
+    if(S_H == 0b00)
+    {
+        HalfWordAndSignedDataTransferArguments halfword_arguments(0, 0, 0, 0, arguments.S, arguments.H, arguments.Rb, arguments.Rd, arguments.Ro);
+        strhArm(halfword_arguments);
+    }
+    else if(S_H == 0b01)
+    {
+        HalfWordAndSignedDataTransferArguments halfword_arguments(0, 0, 0, 1, arguments.S, arguments.H, arguments.Rb, arguments.Rd, arguments.Ro);
+        ldrhArm(halfword_arguments);
+    }
+    else if(S_H == 0b10)
+    {
+        HalfWordAndSignedDataTransferArguments halfword_arguments(0, 0, 0, 1, arguments.S, arguments.H, arguments.Rb, arguments.Rd, arguments.Ro);
+        ldrsbArm(halfword_arguments);
+    }
+    else if(S_H == 0b11)
+    {
+        HalfWordAndSignedDataTransferArguments halfword_arguments(0, 0, 0, 1, arguments.S, arguments.H, arguments.Rb, arguments.Rd, arguments.Ro);
+        ldrshArm(halfword_arguments);
+    }
+    else
+        return; // TODO: invalid S_H error handling
+    
+}
+
+GBA::LoadStoreHalfwordArguments GBA::CPU::decodeLoadStoreHalfwordArguments(uint16_t instruction_code){
+    LoadStoreHalfwordArguments arguments;
+    arguments.Rd = instruction_code & 0x7;
+    arguments.Rb = (instruction_code >> 3) & 0x7;
+    arguments.offset = (instruction_code >> 6) & 0x1F << 1; //#Imm is a full 6-bit address but must be halfword-aligned (ie with bit 0 set to 0) since
+                                                            // the assembler places #Imm >> 1 in the Offset5
+    arguments.L = (instruction_code >> 11) & 0x1;
+    return arguments;
+}
+
+void GBA::CPU::callLoadStoreHalfword(uint16_t instruction_code){
+    LoadStoreHalfwordArguments arguments = decodeLoadStoreHalfwordArguments(instruction_code);
+    uint32_t address = R(arguments.Rb) + arguments.offset;
+    if(arguments.L)
+    {
+        R(arguments.Rd) = memory.memory[address];
+        R(arguments.Rd) |= memory.memory[address + 1] << 8;
+    }
+    else
+    {
+        memory.memory[address] = R(arguments.Rd) & 0xFF;
+        memory.memory[address + 1] = (R(arguments.Rd) >> 8) & 0xFF;
+    }
+}
+
+GBA::SPRelativeLoadStoreArguments GBA::CPU::decodeSPRelativeLoadStoreArguments(uint16_t instruction_code){
+    SPRelativeLoadStoreArguments arguments;
+    arguments.Rd = (instruction_code >> 8) & 0x7;
+    arguments.offset = (instruction_code & 0xFF) << 2;
+    arguments.L = (instruction_code >> 11) & 0x1;
+    return arguments;
+}
+
+void GBA::CPU::callSPRelativeLoadStore(uint16_t instruction_code){
+    SPRelativeLoadStoreArguments arguments = decodeSPRelativeLoadStoreArguments(instruction_code);
+    uint32_t address = SP(getMode()) + arguments.offset; // TODO: check if SP is correct register in thumb mode
+    if(arguments.L)
+    {
+        ldrThumb(address, arguments.Rd, 0);
+    }
+    else
+    {
+        strThumb(address, arguments.Rd, 0);
+    }
+}
+
+GBA::LoadAddressArguments GBA::CPU::decodeLoadAddressArguments(uint16_t instruction_code){
+    LoadAddressArguments arguments;
+    arguments.Rd = (instruction_code >> 8) & 0x7;
+    arguments.offset = (instruction_code & 0xFF) << 2;
+    arguments.SP = (instruction_code >> 11) & 0x1;
+    return arguments;
+}
+
+void GBA::CPU::callLoadAddress(uint16_t instruction_code){
+    LoadAddressArguments arguments = decodeLoadAddressArguments(instruction_code);
+    if(arguments.SP)
+    {
+        R(arguments.Rd) = SP(getMode()) + arguments.offset; // TODO: check if SP is correct register in thumb mode
+    }
+    else
+    {
+        R(arguments.Rd) = PC() & 0xFFFFFFFD; // it 1 of the PC is always read as 0. 
+        R(arguments.Rd) += arguments.offset;
+    }
+}
+
+void GBA::CPU::callAddOffsetToStackPointer(uint16_t instruction_code){
+    uint32_t offset = (instruction_code & 0xFF);
+    bool S = (instruction_code >> 7) & 0x1;
+    int32_t signed_offset = (S << 7) | offset;
+
+    if(S)
+        signed_offset |= ~0xFF; // extend sign bit
+    
+    SP(getMode()) += signed_offset << 2;
+}
+
+GBA::PushPopRegistersArguments GBA::CPU::decodePushPopRegistersArguments(uint16_t instruction_code){
+    PushPopRegistersArguments arguments;
+    arguments.R = (instruction_code >> 8) & 0x1;
+    arguments.L = (instruction_code >> 11) & 0x1;
+    arguments.Rlist = instruction_code & 0xFF;
+    return arguments;
+}
+void GBA::CPU::callPushPopRegisters(uint16_t instruction_code){
+    PushPopRegistersArguments arguments = decodePushPopRegistersArguments(instruction_code);
+    uint32_t register_list = arguments.Rlist;
+    uint32_t L_R = arguments.L << 1 | arguments.R;
+    if(L_R == 0b01)
+    {
+        register_list |= 0x4000; // set LR
+    }
+    else if (L_R == 0b11)
+    {
+        register_list |= 0x8000; // set PC
+    }
+
+    if(arguments.L)
+    {
+        BlockDataTransferArguments block_arguments(0, 0, 0, 1, 1, 13, register_list);
+        ldmArm(block_arguments);
+    }
+    else
+    {
+        BlockDataTransferArguments block_arguments(0, 0, 0, 1, 0, 13, register_list);
+        stmArm(block_arguments);
+    }
+}
+
+void GBA::CPU::callMultipleLoadStore(uint16_t instruction_code){
+    bool L = (instruction_code >> 11) & 0x1;
+    uint32_t Rlist = instruction_code & 0xFF;
+    uint32_t Rb = (instruction_code >> 8) & 0x7;
+    if(L)
+    {
+        BlockDataTransferArguments block_arguments(0, 0, 0, 1, 1, Rb, Rlist);
+        ldmArm(block_arguments);
+    }
+    else
+    {
+        BlockDataTransferArguments block_arguments(0, 0, 0, 1, 0, Rb, Rlist);
+        stmArm(block_arguments);
+    }
+}
+
 uint32_t& GBA::CPU::SP(GBA::CPU::Mode mode) {
     if (mode == GBA::CPU::Mode::User || mode == GBA::CPU::Mode::System) {
         return registers[static_cast<int>(GBA::CPU::RegisterIndex::SP)];
