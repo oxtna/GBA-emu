@@ -181,6 +181,12 @@ class CPU
 
     void callMultipleLoadStore(uint16_t instruction_code);
 
+    void callConditionalBranch(uint16_t instruction_code);
+
+    void callUnconitionalBranch(uint16_t instruction_code);
+
+    void callLongBranchLink(uint16_t instruction_code);
+
     // Stack Pointer, R13 by convention
     uint32_t& SP(Mode mode);
     const uint32_t& SP(Mode mode) const;

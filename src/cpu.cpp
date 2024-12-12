@@ -1494,11 +1494,7 @@ void GBA::CPU::cmpHiRegisterOperationBranchExchange(HiRegisterOperationsBranchEx
     else
         destination_number = arguments.Rd;
 
-    uint32_t result = R(destination_number) - R(source_number);
-    if(result == 0)
-        CPSR |= 0x40000000;
-    else
-        CPSR &= ~0x40000000;
+    DataProcessingArguments data_processing_arguments(1, 0, destination_number, R(source_number), 0, GBA::ShiftType::LogicalLeft);
 }
 
 void GBA::CPU::movHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments){
@@ -1523,17 +1519,12 @@ void GBA::CPU::bxHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExc
     else
         source_number = arguments.Rs;
 
-    PC() = R(source_number);
-    if (PC() & 0x1)
-        CPSR |= 0x20;
-    else
-        CPSR &= ~0x20;
+    bxArm(R(source_number));
 }
 
 void GBA::CPU::callHiRegisterOperationBranchExchangeInstruction(uint16_t instruction_code)
 {
     HiRegisterOperationsBranchExchangeArguments arguments = decodeHiRegisterOperationBranchExchangeArguments(instruction_code);
-    //TODO all functions called below need refactor current code temporary placeholder started writing it but need to find better solution
     if(arguments.op == 0b00)
         addHiRegisterOperationBranchExchange(arguments);
     else if(arguments.op == 0b01)
@@ -1783,6 +1774,35 @@ void GBA::CPU::callMultipleLoadStore(uint16_t instruction_code){
     {
         BlockDataTransferArguments block_arguments(0, 0, 0, 1, 0, Rb, Rlist);
         stmArm(block_arguments);
+    }
+}
+
+void GBA::CPU::callConditionalBranch(uint16_t instruction_code){
+    uint32_t offset = instruction_code & 0xFF;
+    uint32_t condition = (instruction_code >> 8) & 0xF;
+    if(checkCondition(condition))
+    {
+        PC() += offset << 1;
+        PC() -= 4; // TODO check if correct I think it is because PC is 4 bytes ahead due to prefetch  
+    }
+}
+
+void GBA::CPU::callUnconitionalBranch(uint16_t instruction_code){
+    uint32_t offset = instruction_code & 0x7FF;
+    PC() += offset << 1;
+    PC() -= 4; // TODO check if correct I think it is because PC is 4 bytes ahead due to prefetch
+}
+
+void GBA::CPU::callLongBranchLink(uint16_t instruction_code){
+    uint32_t offset = instruction_code & 0x7FF;
+    uint32_t H = (instruction_code >> 11) & 0x1;
+    if(H)
+    {
+        LR(getMode()) = offset << 1;
+        uint32_t current_PC = PC();
+        PC() = LR(getMode());
+        LR(getMode()) = current_PC; // there should be an address of the next instruction after the BL instruction
+        LR(getMode()) |= 0x00000001; // he address of the instruction following the BL is placed in LR and bit 0 of LR is set.
     }
 }
 
