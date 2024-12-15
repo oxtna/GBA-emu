@@ -13,9 +13,19 @@ struct DataProcessingArguments
     uint32_t shifted_value;
     uint32_t shift_value;
     ShiftType shift_type;
+    uint32_t PC;  // address of the instruction
+
     DataProcessingArguments() = default;
-    DataProcessingArguments(bool S, uint32_t _Rd, uint32_t _Rn, uint32_t _shifted_value, uint32_t _shift_value, ShiftType _shift_type)
-        : S(S), Rn(_Rn), Rd(_Rd), shifted_value(_shifted_value), shift_value(_shift_value), shift_type(_shift_type) {};
+    DataProcessingArguments(
+        bool S, uint32_t _Rd, uint32_t _Rn, uint32_t _shifted_value, uint32_t _shift_value, ShiftType _shift_type,
+        uint32_t _PC)
+        : S(S),
+          Rn(_Rn),
+          Rd(_Rd),
+          shifted_value(_shifted_value),
+          shift_value(_shift_value),
+          shift_type(_shift_type),
+          PC(_PC){};
 };
 
 struct MultiplyArguments
@@ -26,10 +36,11 @@ struct MultiplyArguments
     uint32_t Rn;
     uint32_t Rs;
     uint32_t Rm;
+    uint32_t PC;  // address of the instruction
 
     MultiplyArguments() = default;
-    MultiplyArguments(bool _S, bool _A, uint32_t _Rd, uint32_t _Rn, uint32_t _Rs, uint32_t _Rm)
-        : A(_A), S(_S), Rd(_Rd), Rn(_Rn), Rs(_Rs), Rm(_Rm) {};
+    MultiplyArguments(bool _S, bool _A, uint32_t _Rd, uint32_t _Rn, uint32_t _Rs, uint32_t _Rm, uint32_t _PC)
+        : A(_A), S(_S), Rd(_Rd), Rn(_Rn), Rs(_Rs), Rm(_Rm), PC(_PC){};
 };
 
 struct MultiplyLongArguments
@@ -41,6 +52,7 @@ struct MultiplyLongArguments
     uint32_t RdLo;
     uint32_t Rm;
     uint32_t Rs;
+    uint32_t PC;  // address of the instruction
 };
 
 struct SingleDataTransferArguments
@@ -54,6 +66,7 @@ struct SingleDataTransferArguments
     uint32_t Rn;
     uint32_t Rd;
     uint32_t offset;
+    uint32_t PC;  // address of the instruction
 };
 
 struct HalfWordAndSignedDataTransferArguments
@@ -67,9 +80,13 @@ struct HalfWordAndSignedDataTransferArguments
     uint32_t Rn;
     uint32_t Rd;
     uint32_t offset;
+    uint32_t PC;  // address of the instruction
+
     HalfWordAndSignedDataTransferArguments() = default;
-    HalfWordAndSignedDataTransferArguments(bool _P, bool _U, bool _W, bool _L, bool _S, bool _H, uint32_t _Rn, uint32_t _Rd, uint32_t _offset)
-        : P(_P), U(_U), W(_W), L(_L), S(_S), H(_H), Rn(_Rn), Rd(_Rd), offset(_offset) {};
+    HalfWordAndSignedDataTransferArguments(
+        bool _P, bool _U, bool _W, bool _L, bool _S, bool _H, uint32_t _Rn, uint32_t _Rd, uint32_t _offset,
+        uint32_t _PC)
+        : P(_P), U(_U), W(_W), L(_L), S(_S), H(_H), Rn(_Rn), Rd(_Rd), offset(_offset), PC(_PC){};
 };
 
 struct BlockDataTransferArguments
@@ -81,15 +98,19 @@ struct BlockDataTransferArguments
     bool L;              // load/store bit
     uint32_t Rn;         // base register
     uint32_t registers;  // register list bitfield
+    uint32_t PC;         // address of the instruction
+
     BlockDataTransferArguments() = default;
-    BlockDataTransferArguments(bool _P, bool _U, bool _S, bool _W, bool _L, uint32_t _Rn, uint32_t _registers)
-        : P(_P), U(_U), S(_S), W(_W), L(_L), Rn(_Rn), registers(_registers) {};
+    BlockDataTransferArguments(
+        bool _P, bool _U, bool _S, bool _W, bool _L, uint32_t _Rn, uint32_t _registers, uint32_t _PC)
+        : P(_P), U(_U), S(_S), W(_W), L(_L), Rn(_Rn), registers(_registers), PC(_PC){};
 };
 
 struct SingleDataSwapArguments
 {
     uint32_t Rn;
     uint32_t Rd;
+    uint32_t PC;  // address of the instruction
 };
 
 struct CoprocessorDataOperationsArguments
@@ -100,6 +121,7 @@ struct CoprocessorDataOperationsArguments
     uint32_t CP_num;
     uint32_t CP_inf;
     uint32_t C_Rm;
+    uint32_t PC;  // address of the instruction
 };
 
 struct CoprocessorDataTransfersArguments
@@ -113,6 +135,7 @@ struct CoprocessorDataTransfersArguments
     uint32_t CRd;
     uint32_t CP_num;
     uint32_t Offset;
+    uint32_t PC;  // address of the instruction
 };
 
 struct CoprocessorRegisterTransfersArguments
@@ -124,92 +147,117 @@ struct CoprocessorRegisterTransfersArguments
     uint32_t CP_num;
     uint32_t CP_inf;
     uint32_t C_Rm;
+    uint32_t PC;  // address of the instruction
 };
 
-struct MoveShifterRegisterThumbArguments{
+struct MoveShifterRegisterThumbArguments
+{
     uint32_t Rd;
     uint32_t Rs;
     uint32_t shift_value;
     ShiftType shift_type;
+    uint32_t PC;  // address of the instruction
 };
 
-struct AddSubtractThumbArguments{
+struct AddSubtractThumbArguments
+{
     bool I;  // immediate bit
     bool op;
     uint32_t Rd;
     uint32_t Rs;
     uint32_t operand2;
+    uint32_t PC;  // address of the instruction
 };
 
-struct MoveCompareAddSubtractImmediateThumbArguments{
+struct MoveCompareAddSubtractImmediateThumbArguments
+{
     uint32_t Rd;
     uint32_t op;
     uint32_t offset;
+    uint32_t PC;  // address of the instruction
 };
 
-struct ALUoperationThumbArguments{
+struct ALUoperationThumbArguments
+{
     uint32_t Rd;
     uint32_t Rs;
     uint32_t op;
+    uint32_t PC;  // address of the instruction
 };
 
-struct HiRegisterOperationsBranchExchangeArguments{
+struct HiRegisterOperationsBranchExchangeArguments
+{
     uint32_t H1;
     uint32_t H2;
     uint32_t Rd;
     uint32_t Rs;
     uint32_t op;
+    uint32_t PC;  // address of the instruction
 };
 
-struct LoadStoreRegOffsetArguments{
+struct LoadStoreRegOffsetArguments
+{
     bool B;  // byte/word bit
     bool L;  // load/store bit
     uint32_t Rd;
     uint32_t Rb;
     uint32_t Ro;
+    uint32_t PC;  // address of the instruction
 };
 
-struct LoadStoreImmediateOffsetArguments{
+struct LoadStoreImmediateOffsetArguments
+{
     bool B;  // byte/word bit
     bool L;  // load/store bit
     uint32_t Rb;
     uint32_t Rd;
     uint32_t offset;
+    uint32_t PC;  // address of the instruction
 };
 
-struct LoadStoreSignExtendedByteHalfwordArguments{
+struct LoadStoreSignExtendedByteHalfwordArguments
+{
     bool H;  // halfword/byte bit
     bool S;  // sign bit
     uint32_t Rb;
     uint32_t Rd;
     uint32_t Ro;
+    uint32_t PC;  // address of the instruction
 };
 
-struct LoadStoreHalfwordArguments{
+struct LoadStoreHalfwordArguments
+{
     bool L;  // load/store bit
     uint32_t Rb;
     uint32_t Rd;
     uint32_t offset;
+    uint32_t PC;  // address of the instruction
 };
 
-struct SPRelativeLoadStoreArguments{
+struct SPRelativeLoadStoreArguments
+{
     bool L;  // load/store bit
     uint32_t Rd;
     uint32_t offset;
-
+    uint32_t PC;  // address of the instruction
 };
 
-struct LoadAddressArguments{
+struct LoadAddressArguments
+{
     uint32_t Rd;
     uint32_t offset;
     bool SP;
+    uint32_t PC;  // address of the instruction
 };
 
-struct PushPopRegistersArguments{
+struct PushPopRegistersArguments
+{
     bool R;  // register list bit
     bool L;  // load/store bit
     uint32_t Rlist;
-
+    uint32_t PC;  // address of the instruction
 };
+
 }
+
 #endif

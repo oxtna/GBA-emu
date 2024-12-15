@@ -35,13 +35,22 @@ class CPU
     void reset();
 
     Mode getMode() const;
+    void setMode(Mode mode);
+
+    bool inArm() const { return !inThumb(); }
+    bool inThumb() const { return CPSR & 0x20; }
+
     // Check if the instruction should be executed based on the condition field
     bool checkCondition(uint32_t intruction_code) const;
 
-    DataProcessingArguments decodeDataProcessingArguments(uint32_t instruction_code, Opcode opcode);
+    DataProcessingArguments decodeDataProcessingArguments(uint32_t instruction_code, Opcode opcode, uint32_t pc);
     void dataProcessingArmLogicalOperationFlagsSetting(bool S, uint32_t Rd, uint32_t operation_result, bool carry);
     void dataProcessingArmArithmeticOperationFlagsSetting(
-        bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result, uint32_t operand1 ,uint32_t operand2, bool isAdd);
+        bool S, uint32_t Rd_before_operation, uint32_t Rd, uint32_t result, uint32_t operand1, uint32_t operand2,
+        bool isAdd);
+
+    // there is not RET instruction, this is a variant of the MOVS instruction
+    void retArm(DataProcessingArguments arguments);
     void andArm(DataProcessingArguments arguments);
     void xorArm(DataProcessingArguments arguments);
     void subArm(DataProcessingArguments arguments);
@@ -63,47 +72,51 @@ class CPU
 
     std::pair<uint32_t, bool> calculateOperand2(uint32_t shifted_value, uint32_t shift_value, ShiftType shift_type);
     Opcode getOpcodeArm(uint32_t intruction_code) const;
-    void callDataProcessingInstruction(uint32_t intruction_code);  // this function name needs to be changed
+    void
+        callDataProcessingInstruction(uint32_t intruction_code, uint32_t pc);  // this function name needs to be changed
 
-    void callMultiplyInstruction(uint32_t intruction_code);
-    MultiplyArguments decodeMultiplyArguments(uint32_t instruction_code);
+    void callMultiplyInstruction(uint32_t intruction_code, uint32_t pc);
+    MultiplyArguments decodeMultiplyArguments(uint32_t instruction_code, uint32_t pc);
     void mulArm(MultiplyArguments arguments);
     void mlaArm(MultiplyArguments arguments);
     void multiplyArmFlagSetting(bool S, uint32_t Rd);
 
-    void callMultiplyLongInstruction(uint32_t instruction_code);
-    MultiplyLongArguments decodeMultiplyLongArguments(uint32_t instruction_code);
+    void callMultiplyLongInstruction(uint32_t instruction_code, uint32_t pc);
+    MultiplyLongArguments decodeMultiplyLongArguments(uint32_t instruction_code, uint32_t pc);
     void umullArm(MultiplyLongArguments arguments);
     void umlalArm(MultiplyLongArguments arguments);
     void smullArm(MultiplyLongArguments argumentse);
     void smlalArm(MultiplyLongArguments arguments);
 
-    void callSingleDataTransferInstruction(uint32_t instruction_code);
-    SingleDataTransferArguments decodeSingleDataTransferArguments(uint32_t instruction_code);
+    void callSingleDataTransferInstruction(uint32_t instruction_code, uint32_t pc);
+    SingleDataTransferArguments decodeSingleDataTransferArguments(uint32_t instruction_code, uint32_t pc);
     void ldrArm(SingleDataTransferArguments arguments);
     void strArm(SingleDataTransferArguments arguments);
 
-    void callHalfWordAndSignedDataTransferInstruction(uint32_t instruction_code);
-    HalfWordAndSignedDataTransferArguments decodeHalfWordAndSignedDataTransferArguments(uint32_t instruction_code);
+    void callHalfWordAndSignedDataTransferInstruction(uint32_t instruction_code, uint32_t pc);
+    HalfWordAndSignedDataTransferArguments
+        decodeHalfWordAndSignedDataTransferArguments(uint32_t instruction_code, uint32_t pc);
     void ldrhArm(HalfWordAndSignedDataTransferArguments arguments);
     void ldrshArm(HalfWordAndSignedDataTransferArguments arguments);
     void ldrsbArm(HalfWordAndSignedDataTransferArguments arguments);
     void strhArm(HalfWordAndSignedDataTransferArguments arguments);
 
-    void callSingleDataSwapInstruction(uint32_t instruction_code);
+    void callSingleDataSwapInstruction(uint32_t instruction_code, uint32_t pc);
     void swpArm(uint32_t instruction_code);
 
-    void callBlockDataTransferInstruction(uint32_t instruction_code);
-    BlockDataTransferArguments decodeBlockDataTransferInstruction(uint32_t instruction_code);
+    void callBlockDataTransferInstruction(uint32_t instruction_code, uint32_t pc);
+    BlockDataTransferArguments decodeBlockDataTransferInstruction(uint32_t instruction_code, uint32_t pc);
     void ldmArm(BlockDataTransferArguments arguments);
     void stmArm(BlockDataTransferArguments arguments);
 
-    void callBranchAndExchangeInstruction(uint32_t instruction_code);
+    void callBranchAndExchangeInstruction(uint32_t instruction_code, uint32_t pc);
     void bxArm(uint32_t instruction_code);
 
-    void callBranchInstruction(uint32_t instruction_code);
+    void callBranchInstruction(uint32_t instruction_code, uint32_t pc);
     void bArm(uint32_t instruction_code);
-    void blArm(uint32_t instruction_code);
+    void blArm(uint32_t instruction_code, uint32_t pc);
+
+    void callSoftwareInterruptInstruction(uint32_t instruction_code, uint32_t pc);
 
     ThumbInstructionType decodeThumb(uint16_t instruction_code);
 
@@ -119,7 +132,8 @@ class CPU
     void subThumb(AddSubtractThumbArguments arguments);
 
     void callMoveCompareAddSubtractImmediateThumbInstruction(uint16_t instruction_code);
-    MoveCompareAddSubtractImmediateThumbArguments decodeMoveCompareAddSubtractImmediateThumbArguments(uint16_t instruction_code);
+    MoveCompareAddSubtractImmediateThumbArguments
+        decodeMoveCompareAddSubtractImmediateThumbArguments(uint16_t instruction_code);
     void movThumb(MoveCompareAddSubtractImmediateThumbArguments arguments);
     void cmpThumb(MoveCompareAddSubtractImmediateThumbArguments arguments);
     void addThumb(MoveCompareAddSubtractImmediateThumbArguments arguments);
@@ -145,7 +159,8 @@ class CPU
     void mvnThumb(ALUoperationThumbArguments arguments);
 
     void callHiRegisterOperationBranchExchangeInstruction(uint16_t instruction_code);
-    HiRegisterOperationsBranchExchangeArguments decodeHiRegisterOperationBranchExchangeArguments(uint16_t instruction_code);
+    HiRegisterOperationsBranchExchangeArguments
+        decodeHiRegisterOperationBranchExchangeArguments(uint16_t instruction_code);
     void addHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
     void cmpHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
     void movHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
@@ -163,7 +178,8 @@ class CPU
     void strThumb(uint32_t address, uint32_t Rd, bool B);
 
     void callLoadStoreSignExtendedByteHalfword(uint16_t instruction_code);
-    LoadStoreSignExtendedByteHalfwordArguments decodeLoadStoreSignExtendedByteHalfwordArguments(uint16_t instruction_code);
+    LoadStoreSignExtendedByteHalfwordArguments
+        decodeLoadStoreSignExtendedByteHalfwordArguments(uint16_t instruction_code);
 
     void callLoadStoreHalfword(uint16_t instruction_code);
     LoadStoreHalfwordArguments decodeLoadStoreHalfwordArguments(uint16_t instruction_code);
@@ -228,6 +244,8 @@ class CPU
     // General and banked registers for Undefined mode, R0 to R12, R13_UND to R14_UND, and R15
     uint32_t& R_UND(uint32_t index);
     const uint32_t& R_UND(uint32_t index) const;
+
+    uint32_t getCPSR() const { return CPSR; }
 
   private:
     enum class RegisterIndex {
