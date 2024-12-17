@@ -1,6 +1,7 @@
 #include "common.h"
 #include "emulator.h"
 #include <SDL2/SDL.h>
+#include <vector>
 
 void handleKeyEvent(const SDL_Event& event) {
     switch (event.key.keysym.sym) {
@@ -64,15 +65,17 @@ int main(int argc, char** argv) {
         std::fseek(rom_file, 0, SEEK_END);
         auto rom_size = std::ftell(rom_file);
         std::rewind(rom_file);
-        GBA::UniquePtr<uint8_t> rom(static_cast<uint8_t*>(std::malloc(rom_size)));
-        if (rom.get() == NULL) {
-            std::perror("Failed to allocate memory for ROM");
-            std::fclose(rom_file);
+        if (rom_size < 0) {
+            std::fprintf(stderr, "Failed to determine ROM size\n");
             return -1;
         }
-        std::fread(rom.get(), sizeof(uint8_t), rom_size, rom_file);
+        std::vector<uint8_t> rom_buffer(rom_size);
+        if (std::fread(rom_buffer.data(), sizeof(uint8_t), rom_buffer.size(), rom_file) != rom_size) {
+            std::fprintf(stderr, "Failed to read the entire file\n");
+            return -1;
+        }
         std::fclose(rom_file);
-        emulator.loadROM(std::move(rom));
+        emulator.loadBIOS(std::move(rom_buffer));
     }
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -129,6 +132,7 @@ int main(int argc, char** argv) {
             }
         }
         // TODO: emulate n instructions (advance N clock cycles?)
+        emulator.step();  // how many is N?
         SDL_RenderClear(renderer);
         // TODO: render
         SDL_RenderPresent(renderer);
@@ -146,4 +150,3 @@ int main(int argc, char** argv) {
     SDL_DestroyWindow(window);
     SDL_Quit();
 }
-

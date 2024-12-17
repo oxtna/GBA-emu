@@ -9,6 +9,7 @@
 #include <array>
 #include <iostream>
 #include <utility>
+#include <vector>
 
 namespace GBA {
 
@@ -27,6 +28,9 @@ class CPU
 
     CPU();
     ~CPU() = default;
+
+    // TODO: remove this after refactoring Memory, add functionality to Memory
+    void loadBIOS(const std::vector<uint8_t>& bios);
 
     void step();
 
@@ -113,7 +117,7 @@ class CPU
     void bxArm(uint32_t instruction_code);
 
     void callBranchInstruction(uint32_t instruction_code, uint32_t pc);
-    void bArm(uint32_t instruction_code);
+    void bArm(uint32_t instruction_code, uint32_t pc);
     void blArm(uint32_t instruction_code, uint32_t pc);
 
     void callSoftwareInterruptInstruction(uint32_t instruction_code, uint32_t pc);
@@ -165,8 +169,6 @@ class CPU
     void cmpHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
     void movHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
     void bxHiRegisterOperationBranchExchange(HiRegisterOperationsBranchExchangeArguments arguments);
-
-    void callPCRelativeLoad(uint16_t instruction_code);
 
     void callLoadStoreRegOffset(uint16_t instruction_code);
     LoadStoreRegOffsetArguments decodeLoadStoreRegOffsetArguments(uint16_t instruction_code);
@@ -309,6 +311,7 @@ class CPU
     uint32_t SPSR_UND;
     Memory memory;
 };
+
 }
 
 #endif

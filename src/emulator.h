@@ -4,6 +4,7 @@
 #include "common.h"
 #include "cpu.h"
 #include "memory.h"
+#include <vector>
 
 namespace GBA {
 
@@ -11,16 +12,14 @@ class Emulator
 {
   public:
     Emulator();
-    Emulator(UniquePtr<uint8_t> rom);
+    Emulator(const std::vector<uint8_t>& bios);
     ~Emulator();
 
-    void loadROM(UniquePtr<uint8_t> rom);
-    bool run();
+    void loadBIOS(const std::vector<uint8_t>& bios);
+    void step();
 
   private:
-    Memory memory;
     CPU cpu;
-    UniquePtr<uint8_t> rom;
 };
 
 }

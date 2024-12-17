@@ -1,6 +1,7 @@
 #include "cpu.h"
 #include "instruction_types_arguments.h"
 #include "opcode.h"
+#include <iomanip>
 
 GBA::CPU::CPU() : registers{}, CPSR{}, SPSR_FIQ{}, SPSR_SVC{}, SPSR_ABT{}, SPSR_IRQ{}, SPSR_UND{} {
     data_processing_instruction_type[static_cast<int>(GBA::Opcode::AND)] = &GBA::CPU::andArm;
@@ -21,60 +22,72 @@ GBA::CPU::CPU() : registers{}, CPSR{}, SPSR_FIQ{}, SPSR_SVC{}, SPSR_ABT{}, SPSR_
     data_processing_instruction_type[static_cast<int>(GBA::Opcode::MVN)] = &GBA::CPU::mvnArm;
 }
 
+void GBA::CPU::loadBIOS(const std::vector<uint8_t>& bios) {
+    this->memory.loadBIOS(bios);
+}
+
 void GBA::CPU::step() {
-    // TODO: try to reverse the order of fetch->decode->execute? flag issues?
     if (inArm()) {
-        uint32_t instruction_code = memory.memory[PC()];
+        uint32_t pc = PC();
+        uint32_t instruction_code = memory.memory[pc];
+        instruction_code |= memory.memory[pc + 1] << 8;
+        instruction_code |= memory.memory[pc + 2] << 16;
+        instruction_code |= memory.memory[pc + 3] << 24;
+        PC() += 4;
         switch (decodeArm(instruction_code)) {
         case InstructionType::DataProcessing:
-            callDataProcessingInstruction(instruction_code, PC());
+            callDataProcessingInstruction(instruction_code, pc);
             break;
         case InstructionType::ProgramStatusRegisterTransferOut:
             // call(instruction_code);
+            throw;
             break;
         case InstructionType::ProgramStatusRegisterTransferIn:
             // call(instruction_code);
+            throw;
             break;
         case InstructionType::Multiply:
-            callMultiplyInstruction(instruction_code, PC());
+            callMultiplyInstruction(instruction_code, pc);
             break;
         case InstructionType::MultiplyLong:
-            callMultiplyLongInstruction(instruction_code, PC());
+            callMultiplyLongInstruction(instruction_code, pc);
             break;
         case InstructionType::SingleDataSwap:
-            callSingleDataSwapInstruction(instruction_code, PC());
+            callSingleDataSwapInstruction(instruction_code, pc);
             break;
         case InstructionType::BranchAndExchange:
-            callBranchAndExchangeInstruction(instruction_code, PC());
+            callBranchAndExchangeInstruction(instruction_code, pc);
             break;
         case InstructionType::HalfwordDataTransferRegister:
         case InstructionType::HalfwordDataTransferImmediate:
-            callHalfWordAndSignedDataTransferInstruction(instruction_code, PC());
+            callHalfWordAndSignedDataTransferInstruction(instruction_code, pc);
             break;
         case InstructionType::SingleDataTransfer:
-            callSingleDataTransferInstruction(instruction_code, PC());
+            callSingleDataTransferInstruction(instruction_code, pc);
             break;
         case InstructionType::BlockDataTransfer:
-            callBlockDataTransferInstruction(instruction_code, PC());
+            callBlockDataTransferInstruction(instruction_code, pc);
             break;
         case InstructionType::Branch:
-            callBranchInstruction(instruction_code, PC());
+            callBranchInstruction(instruction_code, pc);
             break;
         case InstructionType::CoprocessorDataTransfer:
             // call(instruction_code);
+            throw;
             break;
         case InstructionType::CoprocessorDataOperation:
             // call(instruction_code);
+            throw;
             break;
         case InstructionType::CoprocessorRegisterTransfer:
             // call(instruction_code);
+            throw;
             break;
         case InstructionType::SoftwareInterrupt:
-            callSoftwareInterruptInstruction(instruction_code, PC());
+            callSoftwareInterruptInstruction(instruction_code, pc);
             break;
         case InstructionType::Undefined:
             // call(instruction_code);
-            break;
         default:
             throw;
         }
@@ -349,7 +362,9 @@ GBA::DataProcessingArguments
     if (bit_25) {
         arguments.shifted_value = operand2 & 0xFF;
         arguments.shift_type = GBA::ShiftType::RotateRight;
-        arguments.shift_value = (operand2 >> 8) & 0xF;
+        arguments.shift_value =
+            ((operand2 >> 8) & 0xF) * 2;  // "This value is zero extended to 32 bits, and then subject to a rotate right
+                                          // by *twice* the value in the rotate field."
     }
     else {
         bool bit_4 = (instruction_code >> 4) & 0x1;
@@ -464,18 +479,21 @@ std::pair<uint32_t, bool>
 }
 
 void GBA::CPU::andArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: and\n";
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = R(arguments.Rn) & operand2.first;
     dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd), operand2.second);
 }
 
 void GBA::CPU::xorArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: xor\n";
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = R(arguments.Rn) ^ operand2.first;
     dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd), operand2.second);
 }
 
 void GBA::CPU::subArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: sub\n";
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = R(arguments.Rn) - operand2.first;
@@ -484,6 +502,7 @@ void GBA::CPU::subArm(DataProcessingArguments arguments) {
 }
 
 void GBA::CPU::rsbArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: rsb\n";
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = operand2.first - R(arguments.Rn);
@@ -492,6 +511,7 @@ void GBA::CPU::rsbArm(DataProcessingArguments arguments) {
 }
 
 void GBA::CPU::addArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: add\n";
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = R(arguments.Rn) + operand2.first;
@@ -500,6 +520,7 @@ void GBA::CPU::addArm(DataProcessingArguments arguments) {
 }
 
 void GBA::CPU::adcArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: adc\n";
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = R(arguments.Rn) + operand2.first + ((CPSR >> 29) & 0x1);
@@ -508,6 +529,7 @@ void GBA::CPU::adcArm(DataProcessingArguments arguments) {
 }
 
 void GBA::CPU::sbcArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: sbc\n";
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = R(arguments.Rn) - operand2.first + ((CPSR >> 29) & 0x1) - 1;
@@ -516,6 +538,7 @@ void GBA::CPU::sbcArm(DataProcessingArguments arguments) {
 }
 
 void GBA::CPU::rscArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: rsc\n";
     uint32_t Rd_before_operation = R(arguments.Rd);
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = operand2.first - R(arguments.Rn) + ((CPSR >> 29) & 0x1) - 1;
@@ -524,18 +547,21 @@ void GBA::CPU::rscArm(DataProcessingArguments arguments) {
 }
 
 void GBA::CPU::tstArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: tst\n";
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     uint32_t result = R(arguments.Rn) & operand2.first;
     dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, result, operand2.second);
 }
 
 void GBA::CPU::teqArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: teq\n";
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     uint32_t result = R(arguments.Rn) ^ operand2.first;
     dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, result, operand2.second);
 }
 
 void GBA::CPU::cmpArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: cmp\n";
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     uint32_t result = R(arguments.Rn) - operand2.first;
     dataProcessingArmArithmeticOperationFlagsSetting(
@@ -544,6 +570,7 @@ void GBA::CPU::cmpArm(DataProcessingArguments arguments) {
 }
 
 void GBA::CPU::cmnArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: cmn\n";
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     uint32_t result = R(arguments.Rn) + operand2.first;
     dataProcessingArmArithmeticOperationFlagsSetting(
@@ -552,18 +579,21 @@ void GBA::CPU::cmnArm(DataProcessingArguments arguments) {
 }
 
 void GBA::CPU::orrArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: orr\n";
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = R(arguments.Rn) | operand2.first;
     dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd), operand2.second);
 }
 
 void GBA::CPU::movArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: mov\n";
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = operand2.first;
     dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd), operand2.second);
 }
 
 void GBA::CPU::retArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: mov (ret)\n";
     PC() = LR(getMode());
     if (arguments.S) {
         switch (getMode()) {
@@ -591,18 +621,21 @@ void GBA::CPU::retArm(DataProcessingArguments arguments) {
 }
 
 void GBA::CPU::bicArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: bic\n";
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = R(arguments.Rn) & ~operand2.first;
     dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd), operand2.second);
 }
 
 void GBA::CPU::mvnArm(DataProcessingArguments arguments) {
+    std::cout << "# Instruction type: mvn\n";
     auto operand2 = calculateOperand2(arguments.shifted_value, arguments.shift_value, arguments.shift_type);
     R(arguments.Rd) = ~operand2.first;
     dataProcessingArmLogicalOperationFlagsSetting(arguments.S, arguments.Rd, R(arguments.Rd), operand2.second);
 }
 
 bool GBA::CPU::checkCondition(uint32_t instruction_code) const {
+    std::cout << std::hex << std::setw(8) << std::setfill('0') << instruction_code << std::dec << '\n';
     uint32_t condition = (instruction_code >> 28) & 0xF;
     bool negative_flag = (CPSR >> 31) & 0x1;
     bool zero_flag = (CPSR >> 30) & 0x1;
@@ -707,6 +740,8 @@ void GBA::CPU::callMultiplyInstruction(uint32_t instruction_code, uint32_t pc) {
     if (!checkCondition(instruction_code))
         return;
 
+    // TODO: remove debug statements
+    std::cout << "# Instruction type: Multiply\n";
     GBA::MultiplyArguments arguments = decodeMultiplyArguments(instruction_code, pc);
     if (arguments.A)
         mlaArm(arguments);
@@ -761,6 +796,7 @@ void GBA::CPU::callMultiplyLongInstruction(uint32_t instruction_code, uint32_t p
     if (!checkCondition(instruction_code))
         return;
 
+    std::cout << "# Instruction type: Multiply Long\n";
     GBA::MultiplyLongArguments arguments = decodeMultiplyLongArguments(instruction_code, pc);
     if (arguments.U) {
         if (arguments.A)
@@ -878,7 +914,7 @@ void GBA::CPU::strArm(SingleDataTransferArguments arguments) {
     }
 
     if (arguments.B)
-        memory.memory[address] = R(arguments.Rd);
+        memory.memory[address] = R(arguments.Rd) & 0xFF;
     else {
         memory.memory[address] = R(arguments.Rd) & 0xFF;
         memory.memory[address + 1] = (R(arguments.Rd) >> 8) & 0xFF;
@@ -901,6 +937,7 @@ void GBA::CPU::callSingleDataTransferInstruction(uint32_t instruction_code, uint
     if (!checkCondition(instruction_code))
         return;
 
+    std::cout << "# Instruction type: Single Data Transfer\n";
     GBA::SingleDataTransferArguments arguments = decodeSingleDataTransferArguments(instruction_code, pc);
     if (arguments.L)
         ldrArm(arguments);
@@ -983,6 +1020,7 @@ void GBA::CPU::ldrsbArm(HalfWordAndSignedDataTransferArguments arguments) {
             address -= arguments.offset;
     }
 
+    // load single byte and sign-extend it
     R(arguments.Rd) = memory.memory[address];
     if (R(arguments.Rd) & (1 << 7))
         R(arguments.Rd) |= 0xFFFFFF00;
@@ -1026,6 +1064,7 @@ void GBA::CPU::callHalfWordAndSignedDataTransferInstruction(uint32_t instruction
     if (!checkCondition(instruction_code))
         return;
 
+    std::cout << "# Instruction type: Halfword Data Transfer\n";
     GBA::HalfWordAndSignedDataTransferArguments arguments =
         decodeHalfWordAndSignedDataTransferArguments(instruction_code, pc);
     if (arguments.L == 0b0)
@@ -1047,6 +1086,7 @@ void GBA::CPU::callSingleDataSwapInstruction(uint32_t instruction_code, uint32_t
     if (!checkCondition(instruction_code))
         return;
 
+    std::cout << "# Instruction type: Single Data Swap\n";
     swpArm(instruction_code);
 }
 
@@ -1059,7 +1099,6 @@ void GBA::CPU::swpArm(uint32_t instruction_code) {
     uint32_t Rm_value = R(Rm);
     if (bit_22) {
         R(Rd) = memory.memory[address];
-        R(Rd) &= 0xFF;
     }
     else {
         R(Rd) = memory.memory[address];
@@ -1083,6 +1122,7 @@ void GBA::CPU::callBlockDataTransferInstruction(uint32_t instruction_code, uint3
     if (!checkCondition(instruction_code))
         return;
 
+    std::cout << "# Instruction type: Block Data Transfer\n";
     BlockDataTransferArguments arguments = decodeBlockDataTransferInstruction(instruction_code, pc);
     if (arguments.L == 0b1) {
         ldmArm(arguments);
@@ -1187,6 +1227,7 @@ void GBA::CPU::stmArm(GBA::BlockDataTransferArguments arguments) {
 }
 
 void GBA::CPU::callSoftwareInterruptInstruction(uint32_t instruction_code, uint32_t pc) {
+    std::cout << "# Instruction type: Software Interrupt\n";
     LR(Mode::Supervisor) = pc + 4;
     PC() = 0x08;
     SPSR_SVC = CPSR;
@@ -1196,6 +1237,7 @@ void GBA::CPU::callSoftwareInterruptInstruction(uint32_t instruction_code, uint3
 void GBA::CPU::bxArm(uint32_t instruction_code) {
     uint32_t Rn = R(instruction_code & 0xF);
     PC() = Rn;
+    // Check: Arm or Thumb
     if (Rn & 0x1)
         CPSR |= (1 << 5);
     else
@@ -1206,6 +1248,7 @@ void GBA::CPU::callBranchAndExchangeInstruction(uint32_t instruction_code, uint3
     if (!checkCondition(instruction_code))
         return;
 
+    std::cout << "# Instruction type: Branch Exchange\n";
     bxArm(instruction_code);
 }
 
@@ -1215,26 +1258,27 @@ void GBA::CPU::blArm(uint32_t instruction_code, uint32_t pc) {
         offset |= 0xFF000000;
 
     R(14) = pc + 4;
-    PC() += offset << 2;
+    PC() = (offset << 2) + pc + 8;  // acount for prefetch
 }
 
-void GBA::CPU::bArm(uint32_t instruction_code) {
+void GBA::CPU::bArm(uint32_t instruction_code, uint32_t pc) {
     int32_t offset = instruction_code & 0xFFFFFF;
     if (offset & 0x800000)  // sign extend to 32 bits
         offset |= 0xFF000000;
 
-    PC() += offset << 2;
+    PC() = (offset << 2) + pc + 8;  // account for prefetch
 }
 
 void GBA::CPU::callBranchInstruction(uint32_t instruction_code, uint32_t pc) {
     if (!checkCondition(instruction_code))
         return;
 
-    if ((instruction_code >> 24) & 0x1) {
+    std::cout << "# Instruction type: Branch\n";
+    if ((instruction_code >> 24) & 0b1) {
         blArm(instruction_code, pc);
     }
     else {
-        bArm(instruction_code);
+        bArm(instruction_code, pc);
     }
 }
 
@@ -1634,12 +1678,6 @@ void GBA::CPU::callHiRegisterOperationBranchExchangeInstruction(uint16_t instruc
         bxHiRegisterOperationBranchExchange(arguments);
     else
         return;  // TODO: invalid op error handling
-}
-
-void GBA::CPU::callPCRelativeLoad(uint16_t instruction_code) {
-    uint32_t offset = (instruction_code & 0xFF) << 2;
-    uint32_t Rd = (instruction_code >> 8) & 0x7;
-    R(Rd) = memory.memory[PC() + offset];  // TODO check if maybe PC should be incremented by 4 or decrement by 4
 }
 
 GBA::LoadStoreRegOffsetArguments GBA::CPU::decodeLoadStoreRegOffsetArguments(uint16_t instruction_code) {

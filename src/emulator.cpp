@@ -1,21 +1,23 @@
 #include "emulator.h"
 
-GBA::Emulator::Emulator() : memory{}, cpu{}, rom{} {
+GBA::Emulator::Emulator() : cpu{} {
+    this->cpu.reset();
 }
 
-GBA::Emulator::Emulator(GBA::UniquePtr<uint8_t> rom) : memory{}, cpu{}, rom(std::move(rom)) {
+GBA::Emulator::Emulator(const std::vector<uint8_t>& bios) : cpu{} {
+    this->cpu.loadBIOS(bios);
+    this->cpu.reset();
 }
 
 GBA::Emulator::~Emulator() {
 }
 
-void GBA::Emulator::loadROM(GBA::UniquePtr<uint8_t> rom) {
+void GBA::Emulator::loadBIOS(const std::vector<uint8_t>& bios) {
     // TODO: reset registers, memory and display
-    this->rom = std::move(rom);
+    this->cpu.loadBIOS(bios);
+    this->cpu.reset();
 }
 
-bool GBA::Emulator::run() {
-    // TODO
-    return true;
+void GBA::Emulator::step() {
+    this->cpu.step();
 }
-
