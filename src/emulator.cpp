@@ -21,3 +21,7 @@ void GBA::Emulator::loadBIOS(const std::vector<uint8_t>& bios) {
 void GBA::Emulator::step() {
     this->cpu.step();
 }
+
+std::pair<std::vector<uint8_t>::const_iterator, std::vector<uint8_t>::const_iterator> GBA::Emulator::getDisplay() const {
+    return cpu.getDisplay();
+}

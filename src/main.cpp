@@ -134,6 +134,7 @@ int main(int argc, char** argv) {
         // TODO: emulate n instructions (advance N clock cycles?)
         emulator.step();  // how many is N?
         SDL_RenderClear(renderer);
+        auto [displayBufferStart, displayBufferEnd] = emulator.getDisplay();
         // TODO: render
         SDL_RenderPresent(renderer);
         SDL_UpdateWindowSurface(window);

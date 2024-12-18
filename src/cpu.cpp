@@ -26,6 +26,10 @@ void GBA::CPU::loadBIOS(const std::vector<uint8_t>& bios) {
     this->memory.loadBIOS(bios);
 }
 
+std::pair<std::vector<uint8_t>::const_iterator, std::vector<uint8_t>::const_iterator> GBA::CPU::getDisplay() const {
+    return memory.getDisplayBuffer();
+}
+
 void GBA::CPU::step() {
     if (inArm()) {
         uint32_t pc = PC();
@@ -36,15 +40,9 @@ void GBA::CPU::step() {
         PC() += 4;
         switch (decodeArm(instruction_code)) {
         case InstructionType::DataProcessing:
-            callDataProcessingInstruction(instruction_code, pc);
-            break;
         case InstructionType::ProgramStatusRegisterTransferOut:
-            // call(instruction_code);
-            throw;
-            break;
         case InstructionType::ProgramStatusRegisterTransferIn:
-            // call(instruction_code);
-            throw;
+            callDataProcessingInstruction(instruction_code, pc);
             break;
         case InstructionType::Multiply:
             callMultiplyInstruction(instruction_code, pc);

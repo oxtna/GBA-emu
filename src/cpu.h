@@ -31,6 +31,7 @@ class CPU
 
     // TODO: remove this after refactoring Memory, add functionality to Memory
     void loadBIOS(const std::vector<uint8_t>& bios);
+    std::pair<std::vector<uint8_t>::const_iterator, std::vector<uint8_t>::const_iterator> getDisplay() const;
 
     void step();
 
