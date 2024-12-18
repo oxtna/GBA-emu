@@ -13,7 +13,7 @@ class Memory
   public:
     // This should be mapped somehow
     // https://github.com/ayvacs/gba.js.org/blob/main/iodineGBA/core/Memory.js#L4975
-    static const size_t MaxSize = 1 << 32;
+    static const size_t MaxSize = 0xFFFFFFFF;
     static const size_t DisplayBufferAddress = 1 << 30;
     static const size_t DisplayBufferSize = 240 * 160 * 4;
     Memory();

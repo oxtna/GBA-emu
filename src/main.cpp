@@ -136,6 +136,18 @@ int main(int argc, char** argv) {
         SDL_RenderClear(renderer);
         auto [displayBufferStart, displayBufferEnd] = emulator.getDisplay();
         // TODO: render
+        for(auto it = displayBufferStart; it != displayBufferEnd; it += 4) {
+
+            uint8_t r = *(it);
+            uint8_t g = *(it + 1);
+            uint8_t b = *(it + 2);
+            uint8_t a = *(it + 3);
+
+            framebuffer[(it - displayBufferStart) / 4] = (a << 24) | (r << 16) | (g << 8) | b;
+        }
+
+        SDL_UpdateTexture(texture, NULL, framebuffer, 240 * sizeof(uint32_t));
+        SDL_RenderCopy(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
         SDL_UpdateWindowSurface(window);
         auto elapsed_time = SDL_GetTicks() - current_time;
