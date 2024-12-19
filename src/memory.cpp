@@ -2,18 +2,11 @@
 #include <cstring>
 
 GBA::Memory::Memory() : memory(MaxSize) {
-    for(size_t i = 0; i < DisplayBufferSize / 2; i += 4) {
+    for(size_t i = 0; i < DisplayBufferSize; i += 4) {
         memory[DisplayBufferAddress + i] = 0x00;        // R
         memory[DisplayBufferAddress + i + 1] = 0x00;    // G
-        memory[DisplayBufferAddress + i + 2] = 0xFF;    // B
-        memory[DisplayBufferAddress + i + 3] = 0x00;    // A
-    }
-
-    for(size_t i = DisplayBufferSize / 2; i < DisplayBufferSize; i += 4) {
-        memory[DisplayBufferAddress + i] = 0x00;
-        memory[DisplayBufferAddress + i + 1] = 0xFF;
-        memory[DisplayBufferAddress + i + 2] = 0xFF;
-        memory[DisplayBufferAddress + i + 3] = 0xFF;
+        memory[DisplayBufferAddress + i + 2] = 0x00;    // B
+        memory[DisplayBufferAddress + i + 3] = 0xFF;    // A
     }
 }
 

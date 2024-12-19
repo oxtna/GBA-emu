@@ -132,11 +132,12 @@ int main(int argc, char** argv) {
             }
         }
         // TODO: emulate n instructions (advance N clock cycles?)
-        emulator.step();  // how many is N?
+        for (size_t i = 0; i < 400; i++)
+            emulator.step();  // how many is N?
         SDL_RenderClear(renderer);
         auto [displayBufferStart, displayBufferEnd] = emulator.getDisplay();
         // TODO: render
-        for(auto it = displayBufferStart; it != displayBufferEnd; it += 4) {
+        for (auto it = displayBufferStart; it != displayBufferEnd; it += 4) {
 
             uint8_t r = *(it);
             uint8_t g = *(it + 1);
